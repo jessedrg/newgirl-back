@@ -47,7 +47,11 @@ export class Features {
   @Prop({ enum: ['basic', 'advanced', 'full'], default: 'basic' })
   customization: string;
 
-  @Prop({ enum: [false, 'mild', 'moderate', 'all'], default: false })
+  @Prop({ 
+    type: String,
+    enum: ['none', 'mild', 'moderate', 'all'], 
+    default: 'none' 
+  })
   nsfwContent: string;
 
   @Prop({ default: false })

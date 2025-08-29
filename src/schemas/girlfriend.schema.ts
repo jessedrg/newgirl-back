@@ -20,6 +20,25 @@ export class Creation {
   completedAt: Date;
 }
 
+// Creation session subdocument (for active creation process)
+@Schema({ _id: false })
+export class CreationSession {
+  @Prop({ default: 1, min: 1, max: 6 })
+  currentStep: number;
+
+  @Prop({ type: [Number], default: [] })
+  completedSteps: number[];
+
+  @Prop()
+  token: string;
+
+  @Prop()
+  expiresAt: Date;
+
+  @Prop()
+  createdAt: Date;
+}
+
 // Basic information subdocument
 @Schema({ _id: false })
 export class Basic {
@@ -53,6 +72,9 @@ export class Face {
 
   @Prop({ enum: ['blue', 'brown', 'green', 'hazel', 'gray', 'amber'] })
   eyeColor: string;
+
+  @Prop({ enum: ['blue', 'brown', 'green', 'hazel', 'gray', 'amber'] })
+  color: string;
 
   @Prop({ enum: ['almond', 'round', 'hooded', 'monolid', 'upturned', 'downturned'] })
   eyeShape: string;
@@ -236,6 +258,9 @@ export class Physical {
   @Prop({ enum: ['very_slim', 'slim', 'average', 'curvy', 'plus_size'] })
   weight: string;
 
+  @Prop({ enum: ['caucasian', 'african', 'asian', 'hispanic', 'middle_eastern', 'mixed'] })
+  ethnicity: string;
+
   @Prop({ enum: ['slim', 'athletic', 'curvy', 'pear', 'apple', 'hourglass'] })
   bodyType: string;
 
@@ -259,6 +284,9 @@ export class Physical {
 
   @Prop({ type: Face })
   face: Face;
+
+  @Prop({ type: Face })
+  eyes: Face;
 
   @Prop({ type: Hair })
   hair: Hair;
@@ -314,6 +342,15 @@ export class Traits {
 
   @Prop({ min: 1, max: 10, default: 5 })
   jealousy: number;
+
+  @Prop({ min: 1, max: 10, default: 5 })
+  adventurousness: number;
+
+  @Prop({ min: 1, max: 10, default: 5 })
+  empathy: number;
+
+  @Prop({ min: 1, max: 10, default: 5 })
+  humor: number;
 }
 
 // Communication style subdocument
@@ -321,6 +358,12 @@ export class Traits {
 export class Communication {
   @Prop({ enum: ['sweet', 'warm', 'playful', 'serious', 'sultry', 'bubbly'] })
   speakingStyle: string;
+
+  @Prop({ enum: ['sweet', 'warm', 'playful', 'serious', 'sultry', 'bubbly'] })
+  style: string;
+
+  @Prop({ enum: ['sweet', 'warm', 'playful', 'serious', 'sultry', 'bubbly'] })
+  tone: string;
 
   @Prop({ enum: ['simple', 'average', 'sophisticated', 'academic'] })
   vocabulary: string;
@@ -475,6 +518,9 @@ export class Relationship {
   @Prop({ enum: ['girlfriend', 'wife', 'friend', 'casual', 'dominant', 'submissive'] })
   type: string;
 
+  @Prop({ enum: ['girlfriend', 'wife', 'friend', 'casual', 'dominant', 'submissive'] })
+  style: string;
+
   @Prop({ min: 1, max: 10, default: 5 })
   intimacyLevel: number;
 
@@ -505,6 +551,9 @@ export class Relationship {
 export class Personality {
   @Prop({ enum: ['caregiver', 'adventurer', 'intellectual', 'romantic', 'playful', 'dominant', 'submissive'] })
   personalityType: string;
+
+  @Prop({ enum: ['caregiver', 'adventurer', 'intellectual', 'romantic', 'playful', 'dominant', 'submissive'] })
+  type: string;
 
   @Prop({ type: Traits })
   traits: Traits;
@@ -696,6 +745,66 @@ export class Stats {
   userRating: number;
 }
 
+// Archival tracking subdocument
+@Schema({ _id: false })
+export class Archival {
+  @Prop()
+  reason: string;
+
+  @Prop()
+  archivedAt: Date;
+
+  @Prop()
+  archivedBy: string;
+
+  @Prop({ default: true })
+  preserveData: boolean;
+}
+
+// Deletion tracking subdocument
+@Schema({ _id: false })
+export class Deletion {
+  @Prop()
+  reason: string;
+
+  @Prop()
+  deletedAt: Date;
+
+  @Prop()
+  deletedBy: string;
+
+  @Prop({ default: false })
+  deleteAllData: boolean;
+}
+
+// Progress tracking subdocument
+@Schema({ _id: false })
+export class StepsCompleted {
+  @Prop({ default: false })
+  physical: boolean;
+
+  @Prop({ default: false })
+  personality: boolean;
+
+  @Prop({ default: false })
+  finalized: boolean;
+}
+
+@Schema({ _id: false })
+export class Progress {
+  @Prop({ type: StepsCompleted })
+  stepsCompleted: StepsCompleted;
+
+  @Prop()
+  creationStarted: Date;
+
+  @Prop()
+  creationCompleted: Date;
+
+  @Prop()
+  totalCreationTime: number;
+}
+
 // Main Girlfriend schema
 @Schema({ 
   timestamps: true,
@@ -717,6 +826,9 @@ export class Girlfriend {
   @Prop({ type: Creation })
   creation: Creation;
 
+  @Prop({ type: CreationSession })
+  creationSession: CreationSession;
+
   @Prop({ type: Basic })
   basic: Basic;
 
@@ -735,11 +847,27 @@ export class Girlfriend {
   @Prop({ type: Stats })
   stats: Stats;
 
+  @Prop({ type: Archival })
+  archival: Archival;
+
+  @Prop({ type: Deletion })
+  deletion: Deletion;
+
+  @Prop({ type: Progress })
+  progress: Progress;
+
+  @Prop({ type: Relationship })
+  relationship: Relationship;
+
   @Prop()
   archivedAt: Date;
 
   @Prop()
   deletedAt: Date;
+
+  // Mongoose timestamps (automatically managed)
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export type GirlfriendDocument = Girlfriend & Document;

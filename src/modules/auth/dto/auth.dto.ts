@@ -129,11 +129,25 @@ export class OAuthInitiateResponseDto {
   codeVerifier?: string;
 }
 
-export class ErrorResponseDto {
-  @ApiProperty({ example: false })
+export class ResendVerificationDto {
+  @IsEmail()
+  @ApiProperty({
+    example: 'user@example.com',
+    description: 'Email address to resend verification to'
+  })
+  email: string;
+}
+
+export class ResendVerificationResponseDto {
+  @ApiProperty({ example: true })
   success: boolean;
 
-  @ApiProperty()
+  @ApiProperty({ example: 'Verification email sent successfully' })
+  message: string;
+}
+
+export class ErrorResponseDto {
+  success: boolean;
   error: {
     code: string;
     message: string;

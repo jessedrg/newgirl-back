@@ -1,17 +1,19 @@
-import { Injectable, UnauthorizedException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, ConflictException, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { User, UserDocument } from '../../schemas/user.schema';
-import { RegisterDto, LoginDto, RegisterResponseDto, LoginResponseDto } from './dto/auth.dto';
+import { RegisterDto, LoginDto, RegisterResponseDto, LoginResponseDto, ResendVerificationDto, ResendVerificationResponseDto } from './dto/auth.dto';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private jwtService: JwtService,
+    private emailService: EmailService,
   ) {}
 
   async register(registerDto: RegisterDto): Promise<RegisterResponseDto> {
@@ -104,8 +106,17 @@ export class AuthService {
       { expiresIn: '24h' }
     );
 
-    // TODO: Send verification email
-    // await this.emailService.sendVerificationEmail(email, verificationToken);
+    // Send verification email
+    console.log(`🔄 AuthService: About to call emailService.sendVerificationEmail`);
+    console.log(`📧 Email: ${email}, FirstName: ${firstName}, TokenLength: ${verificationToken.length}`);
+    
+    try {
+      await this.emailService.sendVerificationEmail(email, verificationToken, firstName);
+      console.log(`✅ AuthService: Email service call completed successfully`);
+    } catch (error) {
+      console.error(`❌ AuthService: Email service call failed:`, error);
+      throw error;
+    }
 
     return {
       success: true,
@@ -301,6 +312,72 @@ export class AuthService {
         }
       });
     }
+  }
+
+  async resendVerification(resendDto: ResendVerificationDto): Promise<ResendVerificationResponseDto> {
+    const { email } = resendDto;
+
+    // Find the user
+    const user = await this.userModel.findOne({ email }).exec();
+    if (!user) {
+      throw new BadRequestException({
+        success: false,
+        error: {
+          code: 'USER_NOT_FOUND',
+          message: 'No account found with this email address',
+          field: 'email'
+        }
+      });
+    }
+
+    // Check if user is already verified
+    if (user.emailVerified) {
+      throw new BadRequestException({
+        success: false,
+        error: {
+          code: 'EMAIL_ALREADY_VERIFIED',
+          message: 'Email address is already verified'
+        }
+      });
+    }
+
+    // Check if user account is active (not suspended/banned)
+    if (user.status === 'suspended' || user.status === 'banned') {
+      throw new BadRequestException({
+        success: false,
+        error: {
+          code: 'ACCOUNT_SUSPENDED',
+          message: 'Account is suspended. Please contact support.'
+        }
+      });
+    }
+
+    // Generate new verification token
+    const verificationToken = this.jwtService.sign(
+      { userId: user._id, type: 'email_verification' },
+      { expiresIn: '24h' }
+    );
+
+    // Send verification email
+    console.log(`🔄 ResendVerification: About to call emailService.sendVerificationEmail`);
+    console.log(`📧 Email: ${email}, FirstName: ${user.profile.firstName}, TokenLength: ${verificationToken.length}`);
+    
+    try {
+      await this.emailService.sendVerificationEmail(
+        email, 
+        verificationToken, 
+        user.profile.firstName
+      );
+      console.log(`✅ ResendVerification: Email service call completed successfully`);
+    } catch (error) {
+      console.error(`❌ ResendVerification: Email service call failed:`, error);
+      throw error;
+    }
+
+    return {
+      success: true,
+      message: 'Verification email sent successfully. Please check your inbox.'
+    };
   }
 
   async initiateOAuth(provider: string, redirectUrl?: string): Promise<{ authUrl: string; state: string }> {

@@ -95,27 +95,93 @@ export class GirlfriendsService {
 
     // Update physical attributes
     girlfriend.physical = {
-      ethnicity: updateDto.ethnicity,
-      hair: {
-        style: updateDto.hairStyle,
-        color: updateDto.hairColor
+      height: updateDto.height,
+      weight: 'average',
+      ethnicity: updateDto.ethnicity || 'caucasian',
+      bodyType: updateDto.bodyType,
+      breastSize: updateDto.breastSize,
+      breastShape: 'round',
+      buttSize: updateDto.buttSize,
+      buttShape: 'round',
+      waistSize: 'medium',
+      hipSize: 'medium',
+      face: {
+        shape: 'oval',
+        eyeColor: updateDto.eyeColor,
+        color: updateDto.eyeColor,
+        eyeShape: 'almond',
+        eyeSize: 'medium',
+        eyebrowStyle: 'medium',
+        noseShape: 'straight',
+        lipShape: 'medium',
+        lipSize: 'medium',
+        cheekbones: 'medium',
+        jawline: 'soft',
+        chinShape: 'round',
+        dimples: false,
+        freckles: false
       },
       eyes: {
-        color: updateDto.eyeColor
+        shape: 'oval',
+        eyeColor: updateDto.eyeColor,
+        color: updateDto.eyeColor,
+        eyeShape: 'almond',
+        eyeSize: 'medium',
+        eyebrowStyle: 'medium',
+        noseShape: 'straight',
+        lipShape: 'medium',
+        lipSize: 'medium',
+        cheekbones: 'medium',
+        jawline: 'soft',
+        chinShape: 'round',
+        dimples: false,
+        freckles: false
       },
-      body: {
-        type: updateDto.bodyType,
-        measurements: {
-          breast: updateDto.breastSize,
-          butt: updateDto.buttSize
-        },
-        height: updateDto.height,
-        skinTone: updateDto.skinTone
+      hair: {
+        style: updateDto.hairStyle,
+        color: updateDto.hairColor,
+        length: 'medium',
+        highlights: '',
+        texture: 'straight',
+        bangs: false,
+        bangStyle: ''
       },
-      style: updateDto.style || {
+      skin: {
+        tone: updateDto.skinTone || 'medium',
+        undertone: 'neutral',
+        texture: 'smooth',
+        blemishes: false,
+        freckles: false,
+        moles: false,
+        scars: []
+      },
+      legs: {
+        length: 'average',
+        shape: 'athletic',
+        thighGap: false
+      },
+      arms: {
+        length: 'average',
+        muscleTone: 'toned'
+      },
+      intimate: {
+        pubicHair: 'trimmed',
+        nippleSize: 'medium',
+        nippleColor: 'pink',
+        sensitivity: 'medium'
+      },
+      modifications: {
+        piercings: [],
+        tattoos: [],
+        surgeries: []
+      },
+      style: {
         fashion: 'casual',
         makeup: 'natural',
-        accessories: []
+        nails: 'short',
+        nailColor: 'natural',
+        accessories: [],
+        preferredColors: []
       }
     };
 
@@ -151,19 +217,93 @@ export class GirlfriendsService {
 
     // Update personality
     girlfriend.personality = {
+      personalityType: updateDto.type,
       type: updateDto.type,
-      traits: updateDto.traits,
-      communication: {
-        style: updateDto.speakingStyle,
-        tone: this.getSpeakingTone(updateDto.speakingStyle)
+      traits: {
+        dominance: 5,
+        extroversion: 5,
+        agreeableness: 5,
+        openness: 5,
+        conscientiousness: 5,
+        neuroticism: 5,
+        adventurousness: 5,
+        confidence: 5,
+        empathy: 5,
+        humor: 5,
+        intelligence: 5,
+        playfulness: 5,
+        jealousy: 5
       },
-      interests: updateDto.interests,
+      communication: {
+        speakingStyle: updateDto.speakingStyle,
+        style: updateDto.speakingStyle,
+        tone: this.getSpeakingTone(updateDto.speakingStyle),
+        vocabulary: 'average',
+        humor: 'playful',
+        emotionalExpression: 'moderate',
+        flirtingStyle: 'playful',
+        textingStyle: 'casual'
+      },
+      interests: {
+        hobbies: Array.isArray(updateDto.interests) ? updateDto.interests : [],
+        music: [],
+        movies: [],
+        books: [],
+        food: [],
+        activities: []
+      },
+      sexual: {
+        experience: 'some_experience',
+        libido: 5,
+        initiative: 5,
+        adventurousness: 5,
+        dominance: 5,
+        preferences: {
+          roleplay: false,
+          roughness: 'moderate',
+          pace: 'moderate',
+          positions: [],
+          locations: [],
+          timeOfDay: [],
+          frequency: 'weekly'
+        },
+        kinks: [],
+        boundaries: [],
+        turnOns: [],
+        turnOffs: [],
+        submissiveTraits: {
+          obedience: 5,
+          bratiness: 5,
+          needsApproval: 5,
+          followsOrders: 5,
+          punishment: [],
+          rewards: []
+        },
+        dominantTraits: {
+          control: 5,
+          strictness: 5,
+          nurturing: 5,
+          commands: [],
+          punishments: [],
+          rewards: []
+        }
+      },
       relationship: {
-        style: updateDto.relationshipStyle,
-        intimacyLevel: updateDto.intimacyLevel
+        type: updateDto.relationshipStyle || 'girlfriend',
+        style: updateDto.relationshipStyle || 'girlfriend',
+        intimacyLevel: updateDto.intimacyLevel || 5,
+        affectionLevel: 5,
+        possessiveness: 5,
+        neediness: 5,
+        loyalty: 5,
+        loveLanguages: [],
+        conflictStyle: 'mature',
+        attachmentStyle: 'secure'
       },
       quirks: updateDto.quirks || [],
-      backstory: this.generateBackstory(updateDto)
+      fears: [],
+      dreams: [],
+      secrets: []
     };
 
     // Update progress
@@ -229,12 +369,16 @@ export class GirlfriendsService {
 
     // Initialize relationship data
     girlfriend.relationship = {
-      level: 1,
-      experience: 0,
-      totalMessages: 0,
-      totalChatMinutes: 0,
-      memoriesCount: 0,
-      lastInteraction: new Date()
+      type: 'girlfriend',
+      style: 'girlfriend',
+      intimacyLevel: 5,
+      affectionLevel: 5,
+      possessiveness: 5,
+      neediness: 5,
+      loyalty: 5,
+      loveLanguages: [],
+      conflictStyle: 'mature',
+      attachmentStyle: 'secure'
     };
 
     await girlfriend.save();
@@ -293,8 +437,8 @@ export class GirlfriendsService {
         personality: girlfriend.personality,
         media: girlfriend.media,
         relationship: girlfriend.relationship,
-        createdAt: girlfriend.createdAt,
-        updatedAt: girlfriend.updatedAt
+        createdAt: girlfriend.createdAt?.toISOString(),
+        updatedAt: girlfriend.updatedAt?.toISOString()
       }
     };
   }
@@ -405,7 +549,14 @@ export class GirlfriendsService {
 
     if (updateDto.personality) {
       if (updateDto.personality.interests) {
-        girlfriend.personality.interests = updateDto.personality.interests;
+        girlfriend.personality.interests = {
+          hobbies: Array.isArray(updateDto.personality.interests) ? updateDto.personality.interests : [],
+          music: [],
+          movies: [],
+          books: [],
+          food: [],
+          activities: []
+        };
       }
       if (updateDto.personality.intimacyLevel) {
         girlfriend.personality.relationship.intimacyLevel = updateDto.personality.intimacyLevel;
@@ -443,7 +594,8 @@ export class GirlfriendsService {
     girlfriend.archival = {
       archivedAt: new Date(),
       reason: archiveDto.reason,
-      preserveData: archiveDto.preserveData ?? true
+      preserveData: archiveDto.preserveData ?? true,
+      archivedBy: 'system' // or get from user context
     };
 
     await girlfriend.save();
@@ -486,7 +638,8 @@ export class GirlfriendsService {
     girlfriend.deletion = {
       deletedBy: userId,
       reason: deleteDto.reason,
-      deleteAllData: deleteDto.deleteAllData
+      deleteAllData: deleteDto.deleteAllData,
+      deletedAt: new Date()
     };
 
     await girlfriend.save();
@@ -615,11 +768,43 @@ export class GirlfriendsService {
   private async generateAIConfiguration(girlfriend: GirlfriendDocument) {
     // TODO: Generate comprehensive AI configuration
     return {
-      model: 'gpt-4',
-      temperature: 0.8,
-      maxTokens: 150,
+      responseStyle: {
+        length: 'medium',
+        formality: 'casual',
+        emotiveness: 'moderate',
+        flirtiness: 5,
+        sexualness: 5
+      },
+      memory: {
+        rememberConversations: true,
+        adaptToUser: true,
+        learnPreferences: true,
+        personalityEvolution: false
+      },
+      contentFilters: {
+        nsfwLevel: 3,
+        violenceLevel: 1,
+        profanityLevel: 2,
+        tabooTopics: []
+      },
+      conversationStarters: [
+        `Hi! I'm ${girlfriend.name}. How are you doing today?`,
+        "What's on your mind?",
+        "Tell me about your day!"
+      ],
+      voice: {
+        provider: 'elevenlabs',
+        voiceId: 'default',
+        speed: 1.0,
+        pitch: 0,
+        emotion: 'happy',
+        accent: 'american'
+      },
       systemPrompt: await this.generateSystemPromptPreview(girlfriend),
-      responseStyle: girlfriend.personality.communication.style
+      temperature: 0.8,
+      maxTokens: 2048,
+      memoryEnabled: true,
+      emotionDetection: true
     };
   }
 

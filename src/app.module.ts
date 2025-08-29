@@ -19,6 +19,7 @@ import { TransactionsModule } from './modules/transactions/transactions.module';
 import { SubscriptionEventsModule } from './modules/subscription-events/subscription-events.module';
 import { GeneratedImagesModule } from './modules/generated-images/generated-images.module';
 import { PlatformAnalyticsModule } from './modules/platform-analytics/platform-analytics.module';
+import { EmailModule } from './modules/email/email.module';
 
 @Module({
   imports: [
@@ -29,10 +30,7 @@ import { PlatformAnalyticsModule } from './modules/platform-analytics/platform-a
     }),
 
     // Database connection
-    MongooseModule.forRoot(process.env.MONGODB_URI || 'mongodb://localhost:27017/newgirl', {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    }),
+    MongooseModule.forRoot(process.env.MONGODB_URI || 'mongodb://localhost:27017/newgirl'),
 
     // Rate limiting
     ThrottlerModule.forRoot([
@@ -67,6 +65,7 @@ import { PlatformAnalyticsModule } from './modules/platform-analytics/platform-a
     SubscriptionEventsModule,
     GeneratedImagesModule,
     PlatformAnalyticsModule,
+    EmailModule,
   ],
   controllers: [AppController],
   providers: [AppService],

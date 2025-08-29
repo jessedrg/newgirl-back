@@ -8,6 +8,8 @@ import {
   RefreshTokenDto,
   RegisterResponseDto,
   LoginResponseDto,
+  ResendVerificationDto,
+  ResendVerificationResponseDto,
   OAuthInitiateResponseDto,
   ErrorResponseDto 
 } from './dto/auth.dto';
@@ -76,6 +78,16 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Invalid verification token', type: ErrorResponseDto })
   async verifyEmail(@Query('token') token: string) {
     return this.authService.verifyEmail(token);
+  }
+
+  @Post('resend-verification')
+  @ApiOperation({ summary: 'Resend email verification' })
+  @ApiResponse({ status: 200, description: 'Verification email sent successfully', type: ResendVerificationResponseDto })
+  @ApiResponse({ status: 400, description: 'Bad request - user not found, already verified, or account suspended', type: ErrorResponseDto })
+  async resendVerification(@Body() resendDto: ResendVerificationDto): Promise<ResendVerificationResponseDto> {
+    console.log(`✅ ResendVerification: Email service call completed successfully`);
+    return this.authService.resendVerification(resendDto);
+    
   }
 
   @Get('oauth/:provider/initiate')

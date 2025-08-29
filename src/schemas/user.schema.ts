@@ -93,6 +93,28 @@ export class Security {
   lockedUntil: Date;
 }
 
+// Subscription subdocument
+@Schema({ _id: false })
+export class Subscription {
+  @Prop({ default: 'free', enum: ['free', 'basic', 'premium', 'enterprise'] })
+  plan: string;
+
+  @Prop()
+  startDate: Date;
+
+  @Prop()
+  endDate: Date;
+
+  @Prop({ default: 'active', enum: ['active', 'cancelled', 'expired', 'suspended'] })
+  status: string;
+
+  @Prop()
+  stripeCustomerId: string;
+
+  @Prop()
+  stripeSubscriptionId: string;
+}
+
 // Main User schema
 @Schema({ 
   timestamps: true,
@@ -125,6 +147,9 @@ export class User {
 
   @Prop({ type: Security })
   security: Security;
+
+  @Prop({ type: Subscription })
+  subscription: Subscription;
 
   @Prop()
   lastLoginAt: Date;
