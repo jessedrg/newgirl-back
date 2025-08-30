@@ -5,21 +5,14 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
-// Import all feature modules
+// Import core feature modules
 import { AuthModule } from './modules/auth/auth.module';
-import { UsersModule } from './modules/users/users.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 import { GirlfriendsModule } from './modules/girlfriends/girlfriends.module';
-import { MessagesModule } from './modules/messages/messages.module';
-import { StockGirlfriendsModule } from './modules/stock-girlfriends/stock-girlfriends.module';
-import { UserSavedGirlfriendsModule } from './modules/user-saved-girlfriends/user-saved-girlfriends.module';
-import { UsageTrackingModule } from './modules/usage-tracking/usage-tracking.module';
-import { SubscriptionPlansModule } from './modules/subscription-plans/subscription-plans.module';
-import { WebhookEventsModule } from './modules/webhook-events/webhook-events.module';
-import { TransactionsModule } from './modules/transactions/transactions.module';
-import { SubscriptionEventsModule } from './modules/subscription-events/subscription-events.module';
-import { GeneratedImagesModule } from './modules/generated-images/generated-images.module';
-import { PlatformAnalyticsModule } from './modules/platform-analytics/platform-analytics.module';
 import { EmailModule } from './modules/email/email.module';
+import { UsersModule } from './modules/users/users.module';
+import { ChatModule } from './modules/chat/chat.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -51,21 +44,14 @@ import { EmailModule } from './modules/email/email.module';
       },
     ]),
 
-    // Feature modules
+    // Core feature modules
     AuthModule,
-    UsersModule,
+    PaymentsModule,
     GirlfriendsModule,
-    MessagesModule,
-    StockGirlfriendsModule,
-    UserSavedGirlfriendsModule,
-    UsageTrackingModule,
-    SubscriptionPlansModule,
-    WebhookEventsModule,
-    TransactionsModule,
-    SubscriptionEventsModule,
-    GeneratedImagesModule,
-    PlatformAnalyticsModule,
     EmailModule,
+    UsersModule,
+    ChatModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],

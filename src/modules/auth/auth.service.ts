@@ -206,7 +206,9 @@ export class AuthService {
 
     // Generate tokens
     const payload = { userId: user._id, email: user.email };
+    console.log('🔐 AuthService - Generating token with payload:', payload);
     const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
+    console.log('✅ AuthService - Token generated successfully');
     const refreshToken = this.jwtService.sign(
       { ...payload, type: 'refresh' },
       { expiresIn: rememberMe ? '30d' : '7d' }

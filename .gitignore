@@ -121,6 +121,7 @@ logs
 
 # IDE files
 .vscode/
+!.vscode/launch.json
 .idea/
 *.swp
 *.swo

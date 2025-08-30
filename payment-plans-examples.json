@@ -1,0 +1,128 @@
+[
+  {
+    "name": "Starter Pack",
+    "description": "Perfect for trying out AI companions with basic features",
+    "pricing": {
+      "amount": 499,
+      "currency": "USD",
+      "type": "one-time"
+    },
+    "features": {
+      "chatMinutes": 30,
+      "imageCredits": 5,
+      "tipCredits": 2,
+      "unlimitedChat": false
+    },
+    "active": true,
+    "popular": false,
+    "displayOrder": 1
+  },
+  {
+    "name": "Popular Pack",
+    "description": "Most popular choice! Great value for regular users",
+    "pricing": {
+      "amount": 999,
+      "currency": "USD",
+      "type": "one-time"
+    },
+    "features": {
+      "chatMinutes": 120,
+      "imageCredits": 20,
+      "tipCredits": 10,
+      "unlimitedChat": false
+    },
+    "active": true,
+    "popular": true,
+    "displayOrder": 2
+  },
+  {
+    "name": "Premium Pack",
+    "description": "Maximum value for power users who want more credits",
+    "pricing": {
+      "amount": 1999,
+      "currency": "USD",
+      "type": "one-time"
+    },
+    "features": {
+      "chatMinutes": 300,
+      "imageCredits": 50,
+      "tipCredits": 25,
+      "unlimitedChat": false
+    },
+    "active": true,
+    "popular": false,
+    "displayOrder": 3
+  },
+  {
+    "name": "Monthly Unlimited",
+    "description": "Unlimited chat with monthly image and tip credits",
+    "pricing": {
+      "amount": 2999,
+      "currency": "USD",
+      "type": "monthly"
+    },
+    "features": {
+      "chatMinutes": 0,
+      "imageCredits": 100,
+      "tipCredits": 50,
+      "unlimitedChat": true
+    },
+    "active": true,
+    "popular": false,
+    "displayOrder": 4
+  },
+  {
+    "name": "Chat Minutes Only",
+    "description": "Just need more chat time? This pack is for you",
+    "pricing": {
+      "amount": 299,
+      "currency": "USD",
+      "type": "one-time"
+    },
+    "features": {
+      "chatMinutes": 60,
+      "imageCredits": 0,
+      "tipCredits": 0,
+      "unlimitedChat": false
+    },
+    "active": true,
+    "popular": false,
+    "displayOrder": 5
+  },
+  {
+    "name": "Image Credits Pack",
+    "description": "Generate beautiful images with your AI companion",
+    "pricing": {
+      "amount": 799,
+      "currency": "USD",
+      "type": "one-time"
+    },
+    "features": {
+      "chatMinutes": 0,
+      "imageCredits": 30,
+      "tipCredits": 0,
+      "unlimitedChat": false
+    },
+    "active": true,
+    "popular": false,
+    "displayOrder": 6
+  },
+  {
+    "name": "Tip Credits Pack",
+    "description": "Show appreciation to your favorite AI companions",
+    "pricing": {
+      "amount": 599,
+      "currency": "USD",
+      "type": "one-time"
+    },
+    "features": {
+      "chatMinutes": 0,
+      "imageCredits": 0,
+      "tipCredits": 20,
+      "unlimitedChat": false
+    },
+    "active": true,
+    "popular": false,
+    "displayOrder": 7
+  }
+]

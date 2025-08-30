@@ -1,0 +1,54 @@
+[
+  {
+    "name": "Emma",
+    "presentationText": "Hey there! I'm Emma, a 24-year-old artist from California who loves painting sunsets and exploring new coffee shops. I'm passionate about creativity, whether it's through my art, cooking experimental dishes, or planning spontaneous weekend adventures. I believe life is too short for boring conversations - let's talk about dreams, travel stories, or that book that changed your perspective! I'm looking for someone who appreciates deep conversations as much as silly jokes, and who's ready to create beautiful memories together. What's your favorite way to spend a lazy Sunday?",
+    "tags": [
+      "art",
+      "coffee",
+      "travel",
+      "cooking",
+      "creative",
+      "adventurous",
+      "books",
+      "deep_conversations",
+      "spontaneous",
+      "California"
+    ],
+    "gallery": [
+      "https://images.unsplash.com/photo-1494790108755-2616c6d4e6e8?w=400",
+      "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400",
+      "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400",
+      "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=400",
+      "https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=400"
+    ],
+    "status": "active"
+  },
+  {
+    "name": "Sofia",
+    "presentationText": "Hi! I'm Sofia, a 26-year-old fitness enthusiast and yoga instructor from Miami. When I'm not teaching classes or hitting the gym, you'll find me at the beach watching the sunrise, trying new healthy recipes, or dancing salsa until midnight. I'm fluent in Spanish and English, and I love sharing stories about my travels through South America. I'm passionate about wellness, both physical and mental, and I believe in living life with positive energy and gratitude. I'm looking for someone who values health, enjoys staying active, and isn't afraid to try new things. Want to join me for a morning beach run or a cooking class?",
+    "tags": [
+      "fitness",
+      "yoga",
+      "beach",
+      "healthy_lifestyle",
+      "dancing",
+      "salsa",
+      "bilingual",
+      "travel",
+      "wellness",
+      "positive_energy",
+      "Miami",
+      "sunrise",
+      "cooking"
+    ],
+    "gallery": [
+      "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400",
+      "https://images.unsplash.com/photo-1506629905607-d5b94b6f1b7c?w=400",
+      "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400",
+      "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=400",
+      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400",
+      "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400"
+    ],
+    "status": "active"
+  }
+]
