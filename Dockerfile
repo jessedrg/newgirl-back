@@ -17,7 +17,7 @@ RUN npm ci && npm cache clean --force
 COPY . .
 
 # Build the application
-RUN npm run build
+RUN npx nest build
 
 # Remove dev dependencies after build to reduce image size
 RUN npm prune --production
