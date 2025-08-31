@@ -1,5 +1,5 @@
-# Use Node.js 18 LTS
-FROM node:18-alpine
+# Use Node.js 20 LTS (latest LTS for better compatibility)
+FROM node:20-alpine
 
 # Install curl for health checks
 RUN apk add --no-cache curl
@@ -10,8 +10,10 @@ WORKDIR /app
 # Copy package files first for better Docker layer caching
 COPY package*.json ./
 
-# Install all dependencies (including dev dependencies for build)
-RUN npm ci && npm cache clean --force
+# Configure npm to ignore engine warnings and install dependencies
+RUN npm config set engine-strict false && \
+    npm ci && \
+    npm cache clean --force
 
 # Copy source code
 COPY . .
