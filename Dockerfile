@@ -1,42 +1,41 @@
-# ---------- BUILD ----------
+# ---------- BUILD (dev deps + compile) ----------
   FROM node:20-alpine AS build
   WORKDIR /app
   
-  # Toolchain para deps nativas
+  # Toolchain for native deps (only in build)
   RUN apk add --no-cache python3 make g++
   
-  # Evita el bug de npm 10.x
+  # (Optional but recommended) newer npm to dodge CI bugs
   RUN npm i -g npm@11.5.2
   
-  # Instala deps (incluye dev)
+  # Install with dev deps using lockfile
   COPY package.json package-lock.json ./
   RUN npm ci --no-audit --no-fund
   
-  # Copia código y compila
+  # Copy sources and build (use your existing script, e.g. "nest build")
   COPY . .
-  # Tu package.json debe tener:  "build": "tsc -p tsconfig.build.json"  (o "nest build")
   RUN npm run build
   
-  # ---------- RUNTIME ----------
+  # Prune to production deps IN PLACE (no second install later)
+  RUN npm prune --omit=dev \
+   && npm cache clean --force
+  
+  # ---------- RUNTIME (no npm install here) ----------
   FROM node:20-alpine AS runner
   WORKDIR /app
+  
+  # Lightweight init for clean signals
   RUN apk add --no-cache dumb-init
   
   ENV NODE_ENV=production
   ENV PORT=3000
   
-  # Evita el bug también aquí antes de instalar prod deps
-  COPY package.json package-lock.json ./
-  RUN apk add --no-cache --virtual .gyp python3 make g++ \
-   && npm i -g npm@11.5.2 \
-   && npm ci --omit=dev --no-audit --no-fund \
-   && npm cache clean --force \
-   && apk del .gyp
-  
-  # Solo el build final
+  # Only what's needed to run:
+  COPY --from=build /app/package.json ./package.json
+  COPY --from=build /app/node_modules ./node_modules
   COPY --from=build /app/dist ./dist
   
-  # Seguridad
+  # Drop privileges (node user exists in Node images)
   USER node
   
   EXPOSE 3000
