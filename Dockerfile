@@ -3,11 +3,14 @@ FROM node:20.16.0-alpine AS build
 WORKDIR /app
 RUN apk add --no-cache python3 make g++
 
+# Install TypeScript globally to ensure tsc is available
+RUN npm install -g typescript@5.1.3
+
 # Copy package files
 COPY package.json package-lock.json ./
 
-# Install dependencies
-RUN npm ci --no-audit --no-fund
+# Install dependencies with fallback
+RUN npm ci --no-audit --no-fund || npm install --no-audit --no-fund
 
 # Copy source code
 COPY . .
