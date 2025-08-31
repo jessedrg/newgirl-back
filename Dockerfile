@@ -10,8 +10,8 @@ COPY . .
 # Install dependencies
 RUN npm install
 
-# Build with local TypeScript compiler
-RUN node_modules/.bin/tsc
+# Build with TypeScript compiler using npx
+RUN npx --package=typescript tsc
 
 # Remove dev dependencies
 RUN npm prune --production
