@@ -10,20 +10,26 @@ WORKDIR /app
 # Copy package files first for better Docker layer caching
 COPY package*.json ./
 
-# Configure npm to ignore engine warnings and install dependencies
-RUN npm config set engine-strict false && \
-    npm ci && \
-    npm install -g @nestjs/cli && \
-    npm cache clean --force
+# Configure npm to ignore engine warnings
+RUN npm config set engine-strict false
+
+# Install dependencies with retry logic
+RUN npm ci --no-audit --no-fund || npm ci --no-audit --no-fund
+
+# Install NestJS CLI globally
+RUN npm install -g @nestjs/cli
+
+# Clean npm cache
+RUN npm cache clean --force
 
 # Copy source code
 COPY . .
 
-# Build the application
-RUN npm run build
+# Build the application with error handling
+RUN npm run build || (echo "Build failed, trying with npx..." && npx nest build)
 
 # Remove dev dependencies after build to reduce image size
-RUN npm prune --production
+RUN npm prune --production --no-audit
 
 # Expose port (use default NestJS port)
 EXPOSE 3000
