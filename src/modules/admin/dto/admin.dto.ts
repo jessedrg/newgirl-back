@@ -33,9 +33,6 @@ export class AdminProfileDto {
   @ApiProperty({ description: 'Number of active chat sessions' })
   activeChatSessions: number;
 
-  @ApiProperty({ description: 'Maximum concurrent chats allowed' })
-  maxConcurrentChats: number;
-
   @ApiProperty({ description: 'Admin specialties/tags' })
   specialties: string[];
 

@@ -33,9 +33,6 @@ export class Admin {
   @Prop({ type: Number, default: 0 })
   activeChatSessions: number; // Number of chats currently handling
 
-  @Prop({ type: Number, default: 5 })
-  maxConcurrentChats: number; // Max chats this admin can handle
-
   @Prop({ type: [String], default: [] })
   specialties: string[]; // Tags they're good at (e.g., ['music', 'travel'])
 

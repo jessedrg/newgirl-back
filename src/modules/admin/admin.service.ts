@@ -8,6 +8,7 @@ import { ChatSession, ChatSessionDocument } from '../../schemas/chat-session.sch
 import { ChatMessage, ChatMessageDocument } from '../../schemas/chat-message.schema';
 import { User, UserDocument } from '../../schemas/user.schema';
 import { Girlfriend, GirlfriendDocument } from '../../schemas/girlfriend.schema';
+import { UserWallet, UserWalletDocument } from '../../schemas/user-wallet.schema';
 import { 
   AdminLoginDto, 
   AdminProfileDto, 
@@ -25,6 +26,7 @@ export class AdminService {
     @InjectModel(ChatMessage.name) private chatMessageModel: Model<ChatMessageDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(Girlfriend.name) private girlfriendModel: Model<GirlfriendDocument>,
+    @InjectModel(UserWallet.name) private userWalletModel: Model<UserWalletDocument>,
     private jwtService: JwtService,
   ) {}
 
@@ -81,9 +83,14 @@ export class AdminService {
       .sort({ lastActivity: 1 }) // Oldest first (highest priority)
       .exec();
 
+    // Remove any potential duplicates based on session ID
+    const uniqueSessions = sessions.filter((session, index, self) => 
+      index === self.findIndex(s => s._id.toString() === session._id.toString())
+    );
+
     const activeSessions: ActiveChatSessionDto[] = [];
 
-    for (const session of sessions) {
+    for (const session of uniqueSessions) {
       const user = session.userId as any;
       const girlfriend = session.girlfriendId as any;
       const assignedAdmin = session.adminId as any;
@@ -135,10 +142,7 @@ export class AdminService {
       throw new BadRequestException('Target admin not found or offline');
     }
 
-    // Check if admin has capacity for more chats
-    if (targetAdmin.activeChatSessions >= targetAdmin.maxConcurrentChats) {
-      throw new BadRequestException('Admin has reached maximum concurrent chat limit');
-    }
+    // Admin can handle unlimited chats (no capacity limit)
 
     // Update chat session
     await this.chatSessionModel.findByIdAndUpdate(assignChatDto.sessionId, {
@@ -157,6 +161,39 @@ export class AdminService {
     const session = await this.chatSessionModel.findById(adminSendMessageDto.sessionId);
     if (!session) {
       throw new NotFoundException('Chat session not found');
+    }
+
+    // Check if this is the first admin message in this session (start billing)
+    const existingAdminMessages = await this.chatMessageModel.countDocuments({
+      sessionId: new Types.ObjectId(adminSendMessageDto.sessionId),
+      senderType: { $in: ['girlfriend', 'admin'] }
+    });
+
+    const isFirstAdminMessage = existingAdminMessages === 0;
+
+    // If first admin message, check user has sufficient credits and start billing
+    if (isFirstAdminMessage) {
+      const wallet = await this.userWalletModel.findOne({ userId: session.userId });
+      if (!wallet || wallet.balance.chatMinutes <= 0) {
+        throw new BadRequestException('User has insufficient chat minutes. Cannot start conversation.');
+      }
+
+      // Deduct 1 minute for starting the conversation
+      await this.userWalletModel.findOneAndUpdate(
+        { userId: session.userId },
+        { 
+          $inc: { 
+            'balance.chatMinutes': -1,
+            'usage.totalChatMinutesUsed': 1,
+            'usage.totalSpent': 100 // Assuming $1 per minute = 100 cents
+          }
+        }
+      );
+
+      // Update session to track billing started
+      await this.chatSessionModel.findByIdAndUpdate(adminSendMessageDto.sessionId, {
+        $inc: { minutesUsed: 1 }
+      });
     }
 
     // Determine sender type and ID based on sendAs parameter
@@ -196,22 +233,48 @@ export class AdminService {
     });
   }
 
-  // Release chat session (admin stops handling it)
+  // Release chat session (unassign admin but keep session active)
   async releaseChatSession(adminId: string, sessionId: string): Promise<void> {
     const session = await this.chatSessionModel.findById(sessionId);
-    if (!session || session.adminId?.toString() !== adminId) {
-      throw new NotFoundException('Chat session not found or not assigned to this admin');
+    if (!session) {
+      throw new NotFoundException('Chat session not found');
     }
 
+    // Update session to remove admin assignment
     await this.chatSessionModel.findByIdAndUpdate(sessionId, {
       $unset: { adminId: 1 },
-      isAdminActive: false
+      $set: { isAdminActive: false }
     });
 
     // Update admin's active chat count
     await this.adminModel.findByIdAndUpdate(adminId, {
       $inc: { activeChatSessions: -1 }
     });
+  }
+
+  // End chat session completely (admin can end any session)
+  async endChatSession(adminId: string, sessionId: string): Promise<void> {
+    const session = await this.chatSessionModel.findById(sessionId);
+    if (!session) {
+      throw new NotFoundException('Chat session not found');
+    }
+
+    // Update session to ended status
+    await this.chatSessionModel.findByIdAndUpdate(sessionId, {
+      $set: { 
+        status: 'ended',
+        endedAt: new Date(),
+        isAdminActive: false
+      },
+      $unset: { adminId: 1 }
+    });
+
+    // Update admin's active chat count if they were assigned
+    if (session.adminId && session.adminId.toString() === adminId) {
+      await this.adminModel.findByIdAndUpdate(adminId, {
+        $inc: { activeChatSessions: -1 }
+      });
+    }
   }
 
   // Get admin dashboard stats
@@ -255,6 +318,143 @@ export class AdminService {
     };
   }
 
+  // Get chat history for any session (admin access - bypasses ownership check)
+  // Returns ALL messages between the user and girlfriend across all sessions
+  async getAdminChatHistory(sessionId: string, limit = 50, offset = 0): Promise<any> {
+    // Validate ObjectId format
+    if (!Types.ObjectId.isValid(sessionId)) {
+      throw new BadRequestException('Invalid session ID format');
+    }
+    
+    // Find session without user ownership check (admin can access any session)
+    const session = await this.chatSessionModel.findById(sessionId)
+      .populate('userId', 'email name')
+      .populate('girlfriendId', 'name');
+
+    if (!session) {
+      throw new NotFoundException('Chat session not found');
+    }
+
+    // Get all sessions between this user and girlfriend
+    const allSessions = await this.chatSessionModel
+      .find({ 
+        userId: session.userId,
+        girlfriendId: session.girlfriendId
+      })
+      .select('_id')
+      .exec();
+
+    const sessionIds = allSessions.map(s => s._id);
+
+    // Get ALL messages between this user and girlfriend across all sessions
+    const messages = await this.chatMessageModel
+      .find({ sessionId: { $in: sessionIds } })
+      .sort({ sentAt: 1 })
+      .skip(offset)
+      .limit(limit)
+      .exec();
+
+    const totalMessages = await this.chatMessageModel.countDocuments({ 
+      sessionId: { $in: sessionIds }
+    });
+
+    const user = session.userId as any;
+    const girlfriend = session.girlfriendId as any;
+
+    return {
+      messages: messages.map(msg => ({
+        id: msg._id.toString(),
+        senderId: msg.senderId.toString(),
+        senderType: msg.senderType,
+        content: msg.content,
+        messageType: msg.messageType,
+        sentAt: msg.sentAt,
+        isRead: msg.isRead,
+        actualSenderId: msg.actualSenderId?.toString()
+      })),
+      totalMessages,
+      hasMore: offset + messages.length < totalMessages,
+      sessionInfo: {
+        id: session._id.toString(),
+        userId: user?._id?.toString(),
+        userEmail: user?.email,
+        userName: user?.name,
+        girlfriendName: girlfriend?.name,
+        status: session.status,
+        minutesUsed: session.minutesUsed,
+        totalMessages: session.totalMessages,
+        startedAt: session.startedAt,
+        lastActivity: session.lastActivity
+      }
+    };
+  }
+
+  // Get chat session (for WebSocket validation - admin can access any session)
+  async getChatSession(sessionId: string): Promise<any> {
+    const session = await this.chatSessionModel.findById(sessionId)
+      .populate('userId', 'email name')
+      .populate('girlfriendId', 'name');
+
+    return session;
+  }
+
+  // Send message (for WebSocket - admin sends as girlfriend)
+  async sendMessage(adminId: string, messageData: any): Promise<any> {
+    const { sessionId, content, messageType = 'text', senderType = 'girlfriend' } = messageData;
+
+    const session = await this.chatSessionModel.findById(sessionId);
+    if (!session) {
+      throw new NotFoundException('Chat session not found');
+    }
+
+    // Create message with admin as actual sender
+    const message = new this.chatMessageModel({
+      sessionId: new Types.ObjectId(sessionId),
+      senderId: session.girlfriendId, // Girlfriend is the apparent sender
+      senderType,
+      content,
+      messageType,
+      actualSenderId: new Types.ObjectId(adminId), // Track actual admin sender
+      sentAt: new Date()
+    });
+
+    await message.save();
+
+    // Update session
+    await this.chatSessionModel.findByIdAndUpdate(sessionId, {
+      $inc: { totalMessages: 1 },
+      lastActivity: new Date()
+    });
+
+    // Handle billing - deduct minute on first admin message
+    if (session.totalMessages === 0 || !session.billingStarted) {
+      await this.handleBillingForFirstMessage(session.userId.toString());
+      await this.chatSessionModel.findByIdAndUpdate(sessionId, {
+        billingStarted: true,
+        $inc: { minutesUsed: 1 }
+      });
+    }
+
+    return {
+      id: message._id.toString(),
+      senderId: message.senderId.toString(),
+      senderType: message.senderType,
+      content: message.content,
+      messageType: message.messageType,
+      sentAt: message.sentAt,
+      actualSenderId: message.actualSenderId?.toString()
+    };
+  }
+
+  // Helper method to handle billing for first admin message
+  private async handleBillingForFirstMessage(userId: string): Promise<void> {
+    // Deduct 1 minute from user's wallet
+    await this.userWalletModel.findOneAndUpdate(
+      { userId: new Types.ObjectId(userId) },
+      { $inc: { chatMinutes: -1 } }
+    );
+  }
+
   // Helper method to format admin profile
   private formatAdminProfile(admin: AdminDocument): AdminProfileDto {
     return {
@@ -265,7 +465,6 @@ export class AdminService {
       isActive: admin.isActive,
       isOnline: admin.isOnline,
       activeChatSessions: admin.activeChatSessions,
-      maxConcurrentChats: admin.maxConcurrentChats,
       specialties: admin.specialties,
       lastLogin: admin.lastLogin
     };

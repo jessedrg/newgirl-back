@@ -11,6 +11,7 @@ import { ChatSession, ChatSessionSchema } from '../../schemas/chat-session.schem
 import { ChatMessage, ChatMessageSchema } from '../../schemas/chat-message.schema';
 import { User, UserSchema } from '../../schemas/user.schema';
 import { Girlfriend, GirlfriendSchema } from '../../schemas/girlfriend.schema';
+import { UserWallet, UserWalletSchema } from '../../schemas/user-wallet.schema';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { Girlfriend, GirlfriendSchema } from '../../schemas/girlfriend.schema';
       { name: ChatMessage.name, schema: ChatMessageSchema },
       { name: User.name, schema: UserSchema },
       { name: Girlfriend.name, schema: GirlfriendSchema },
+      { name: UserWallet.name, schema: UserWalletSchema },
     ]),
     PassportModule,
     JwtModule.registerAsync({

@@ -71,7 +71,7 @@ export class ChatService {
       throw new NotFoundException('Chat session not found or not active');
     }
 
-    // Check user has chat minutes
+    // Check user has chat minutes (but don't deduct yet - billing starts when admin responds)
     const wallet = await this.userWalletModel.findOne({ userId: new Types.ObjectId(userId) });
     if (!wallet || wallet.balance.chatMinutes <= 0) {
       throw new BadRequestException('Insufficient chat minutes');
@@ -89,22 +89,11 @@ export class ChatService {
 
     await message.save();
 
-    // Update session stats
+    // Update session stats (but don't deduct minutes yet)
     await this.chatSessionModel.findByIdAndUpdate(sendMessageDto.sessionId, {
       $inc: { totalMessages: 1 },
       $set: { lastActivity: new Date() }
     });
-
-    // Deduct 1 minute from user wallet (simplified billing)
-    await this.userWalletModel.findOneAndUpdate(
-      { userId: new Types.ObjectId(userId) },
-      { 
-        $inc: { 
-          'balance.chatMinutes': -1,
-          'usage.totalChatMinutesUsed': 1 
-        }
-      }
-    );
 
     return this.formatChatMessage(message);
   }
@@ -121,22 +110,21 @@ export class ChatService {
       throw new NotFoundException('Chat session not found');
     }
 
-    // Get messages
+    // Get messages using session._id directly for consistency
     const messages = await this.chatMessageModel
-      .find({ sessionId: new Types.ObjectId(sessionId) })
+      .find({ sessionId: session._id })
       .sort({ sentAt: 1 })
       .skip(offset)
       .limit(limit)
       .exec();
 
     const totalMessages = await this.chatMessageModel.countDocuments({ 
-      sessionId: new Types.ObjectId(sessionId) 
+      sessionId: session._id 
     });
 
     const girlfriend = session.girlfriendId as any;
 
     return {
-      session: this.formatChatSession(session, girlfriend),
       messages: messages.map(msg => this.formatChatMessage(msg)),
       totalMessages,
       hasMore: offset + messages.length < totalMessages
@@ -175,6 +163,81 @@ export class ChatService {
     });
   }
 
+  // Get all historical messages between user and specific girlfriend (across all sessions)
+  async getUserGirlfriendHistory(userId: string, girlfriendId: string, limit = 100, offset = 0): Promise<{
+    messages: ChatMessageDto[];
+    totalMessages: number;
+    hasMore: boolean;
+    girlfriendName: string;
+  }> {
+    // Verify girlfriend exists
+    const girlfriend = await this.girlfriendModel.findById(girlfriendId);
+    if (!girlfriend) {
+      throw new NotFoundException('Girlfriend not found');
+    }
+
+    // Get all sessions between this user and girlfriend
+    const sessions = await this.chatSessionModel
+      .find({
+        userId: new Types.ObjectId(userId),
+        girlfriendId: new Types.ObjectId(girlfriendId)
+      })
+      .select('_id')
+      .exec();
+
+    const sessionIds = sessions.map(session => session._id);
+
+    if (sessionIds.length === 0) {
+      return {
+        messages: [],
+        totalMessages: 0,
+        hasMore: false,
+        girlfriendName: girlfriend.name
+      };
+    }
+
+    // Get messages from all sessions
+    const messages = await this.chatMessageModel
+      .find({ sessionId: { $in: sessionIds } })
+      .sort({ sentAt: -1 }) // Most recent first
+      .skip(offset)
+      .limit(limit)
+      .exec();
+
+    // Get total message count
+    const totalMessages = await this.chatMessageModel.countDocuments({
+      sessionId: { $in: sessionIds }
+    });
+
+    return { 
+      messages: messages.reverse().map(msg => this.formatChatMessage(msg)), // Reverse to show chronological order
+      totalMessages, 
+      hasMore: offset + messages.length < totalMessages, 
+      girlfriendName: girlfriend.name 
+    };
+  }
+
+  // Update typing status for a chat session
+  async updateTypingStatus(userId: string, typingStatusDto: any): Promise<void> {
+    const session = await this.chatSessionModel.findById(typingStatusDto.sessionId);
+    if (!session) {
+      throw new NotFoundException('Chat session not found');
+    }
+
+    // Verify the session belongs to the user
+    if (session.userId.toString() !== userId) {
+      throw new ForbiddenException('You can only update typing status for your own chat sessions');
+    }
+
+    // Update the session with typing status and last activity
+    await this.chatSessionModel.findByIdAndUpdate(typingStatusDto.sessionId, {
+      $set: { 
+        lastActivity: new Date(),
+        isUserTyping: typingStatusDto.isTyping
+      }
+    });
+  }
+
   // Helper methods
   private formatChatSession(session: ChatSessionDocument, girlfriend: any): ChatSessionDto {
     return {
@@ -204,5 +267,49 @@ export class ChatService {
       sentAt: message.sentAt,
       isEdited: message.isEdited
     };
+  }
+
+  // Pause session billing (when admin disconnects)
+  async pauseSessionBilling(sessionId: string): Promise<void> {
+    const session = await this.chatSessionModel.findById(sessionId);
+    if (!session) {
+      throw new NotFoundException('Chat session not found');
+    }
+
+    // Only pause if session is active and billing is not already paused
+    if (session.status === 'active' && !session.billingPaused) {
+      await this.chatSessionModel.findByIdAndUpdate(sessionId, {
+        billingPaused: true,
+        billingPausedAt: new Date(),
+        lastActivity: new Date()
+      });
+    }
+  }
+
+  // Resume session billing (when admin reconnects)
+  async resumeSessionBilling(sessionId: string): Promise<void> {
+    const session = await this.chatSessionModel.findById(sessionId);
+    if (!session) {
+      throw new NotFoundException('Chat session not found');
+    }
+
+    // Only resume if session is active and billing is paused
+    if (session.status === 'active' && session.billingPaused) {
+      await this.chatSessionModel.findByIdAndUpdate(sessionId, {
+        billingPaused: false,
+        $unset: { billingPausedAt: 1 },
+        lastActivity: new Date()
+      });
+    }
+  }
+
+  // Get chat session (for WebSocket validation)
+  async getChatSession(userId: string, sessionId: string): Promise<any> {
+    const session = await this.chatSessionModel.findOne({
+      _id: new Types.ObjectId(sessionId),
+      userId: new Types.ObjectId(userId)
+    }).populate('girlfriendId', 'name');
+
+    return session;
   }
 }

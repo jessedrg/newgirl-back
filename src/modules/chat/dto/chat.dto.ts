@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, IsEnum, IsMongoId } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsMongoId, IsNotEmpty, IsBoolean } from 'class-validator';
 
 export class StartChatDto {
   @ApiProperty({ description: 'ID of the girlfriend to chat with' })
@@ -94,9 +94,6 @@ export class ChatMessageDto {
 }
 
 export class ChatHistoryDto {
-  @ApiProperty({ description: 'Chat session info' })
-  session: ChatSessionDto;
-
   @ApiProperty({ description: 'Messages in this chat', type: [ChatMessageDto] })
   messages: ChatMessageDto[];
 
@@ -105,4 +102,15 @@ export class ChatHistoryDto {
 
   @ApiProperty({ description: 'Has more messages (pagination)' })
   hasMore: boolean;
+}
+
+export class TypingStatusDto {
+  @ApiProperty({ description: 'Chat session ID' })
+  @IsString()
+  @IsNotEmpty()
+  sessionId: string;
+
+  @ApiProperty({ description: 'Whether user is typing' })
+  @IsBoolean()
+  isTyping: boolean;
 }

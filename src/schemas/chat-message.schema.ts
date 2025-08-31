@@ -42,6 +42,13 @@ export class ChatMessage {
   // For admin context - who was pretending to be the girlfriend
   @Prop({ type: Types.ObjectId, ref: 'User', default: null })
   actualSenderId: Types.ObjectId | null; // The admin who sent this as "girlfriend"
+
+  // For message replay functionality
+  @Prop({ type: Boolean, default: false })
+  deliveredToAdmin: boolean; // Has this message been delivered to admin via WebSocket
+
+  @Prop({ type: Date, default: null })
+  deliveredToAdminAt: Date | null; // When message was delivered to admin
 }
 
 export const ChatMessageSchema = SchemaFactory.createForClass(ChatMessage);
@@ -50,3 +57,4 @@ export const ChatMessageSchema = SchemaFactory.createForClass(ChatMessage);
 ChatMessageSchema.index({ sessionId: 1, sentAt: 1 });
 ChatMessageSchema.index({ senderId: 1 });
 ChatMessageSchema.index({ sessionId: 1, senderType: 1 });
+ChatMessageSchema.index({ sessionId: 1, senderType: 1, deliveredToAdmin: 1 }); // For message replay queries

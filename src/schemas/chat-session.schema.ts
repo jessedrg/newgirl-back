@@ -39,6 +39,21 @@ export class ChatSession {
   @Prop({ type: Boolean, default: false })
   isAdminActive: boolean; // Is an admin currently in this chat?
 
+  @Prop({ type: Boolean, default: false })
+  billingPaused: boolean; // Is billing currently paused?
+
+  @Prop({ type: Date, default: null })
+  billingPausedAt: Date | null; // When billing was paused
+
+  @Prop({ type: Boolean, default: false })
+  billingStarted: boolean; // Has billing started for this session?
+
+  @Prop({ type: Boolean, default: false })
+  isUserTyping: boolean; // User typing status
+
+  @Prop({ type: Boolean, default: false })
+  isAdminTyping: boolean; // Admin typing status
+
   @Prop({ type: String, default: null })
   sessionNotes: string | null; // Admin notes about the session
 }
@@ -50,3 +65,13 @@ ChatSessionSchema.index({ userId: 1, status: 1 });
 ChatSessionSchema.index({ adminId: 1 });
 ChatSessionSchema.index({ status: 1, lastActivity: -1 });
 ChatSessionSchema.index({ girlfriendId: 1, status: 1 });
+
+// Unique constraint to prevent duplicate active sessions for same user-girlfriend pair
+ChatSessionSchema.index(
+  { userId: 1, girlfriendId: 1, status: 1 }, 
+  { 
+    unique: true, 
+    partialFilterExpression: { status: 'active' },
+    name: 'unique_active_session'
+  }
+);

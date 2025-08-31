@@ -35,7 +35,6 @@ const adminAccounts = [
     password: 'admin123!',
     name: 'Super Admin',
     role: 'super_admin',
-    maxConcurrentChats: 10,
     specialties: ['management', 'support', 'technical']
   },
   {
@@ -43,7 +42,6 @@ const adminAccounts = [
     password: 'chat123!',
     name: 'Emma Chat Admin',
     role: 'chat_admin',
-    maxConcurrentChats: 5,
     specialties: ['music', 'travel', 'lifestyle']
   },
   {
@@ -51,7 +49,6 @@ const adminAccounts = [
     password: 'chat123!',
     name: 'Sophia Chat Admin',
     role: 'chat_admin',
-    maxConcurrentChats: 5,
     specialties: ['art', 'books', 'nature']
   },
   {
@@ -59,7 +56,6 @@ const adminAccounts = [
     password: 'support123!',
     name: 'Support Admin',
     role: 'support_admin',
-    maxConcurrentChats: 3,
     specialties: ['customer_service', 'billing', 'technical_support']
   }
 ];
