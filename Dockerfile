@@ -1,57 +1,52 @@
-# Multi-stage build for production NestJS app on DigitalOcean
-FROM node:18-alpine AS builder
-
-# Set working directory
+# ---------- 1) BUILD ---------- #
+FROM node:20-alpine AS build
 WORKDIR /app
 
-# Copy package files for dependency installation
-COPY package*.json ./
+# Herramientas para compilar dependencias nativas si hiciera falta (bcrypt, etc.)
+RUN apk add --no-cache python3 make g++
 
-# Install all dependencies (including devDependencies for build)
-RUN npm ci --only=production=false
+# Sube npm para evitar bugs (p.ej. "Exit handler never called!")
+RUN npm i -g npm@latest
 
-# Copy source code
+# Instala deps según lockfile (incluye dev deps)
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+
+# Copia el código y compila (usa tu script de build)
 COPY . .
+# Asegúrate de tener "build": "tsc -p tsconfig.build.json" o similar en package.json
+RUN npm run build
 
-# Build the application using TypeScript compiler directly
-RUN npx tsc
+# ---------- 2) RUNTIME ---------- #
+FROM node:20-alpine AS runner
+WORKDIR /app
 
-# Production stage
-FROM node:18-alpine AS production
-
-# Install dumb-init for proper signal handling
+# init para señales limpias (opcional pero recomendado)
 RUN apk add --no-cache dumb-init
 
-# Create app user for security
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nestjs -u 1001
-
-# Set working directory
-WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-
-# Install only production dependencies
-RUN npm ci --only=production && npm cache clean --force
-
-# Copy built application from builder stage
-COPY --from=builder /app/dist ./dist
-
-# Change ownership to app user
-RUN chown -R nestjs:nodejs /app
-USER nestjs
-
-# Set environment variables
 ENV NODE_ENV=production
+# App Platform inyecta $PORT; tu app debe leer process.env.PORT
 ENV PORT=3000
 
-# Expose port
+# Copiamos solo lo necesario
+COPY package.json package-lock.json ./
+
+# Si hay deps nativas, instala toolchain solo durante la instalación y luego elimínalo
+RUN apk add --no-cache --virtual .gyp python3 make g++ \
+ && npm i -g npm@latest \
+ && npm ci --omit=dev --no-audit --no-fund \
+ && npm cache clean --force \
+ && apk del .gyp
+
+# Binarios compilados
+COPY --from=build /app/dist ./dist
+
+# Seguridad: usa el usuario "node" ya existente en la imagen oficial
+USER node
+
 EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD node -e "process.exit(0)"
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node --version || exit 1
-
-# Start the application with dumb-init
-CMD ["dumb-init", "node", "dist/main"]
+ENTRYPOINT ["dumb-init","--"]
+CMD ["node","dist/main.js"]
