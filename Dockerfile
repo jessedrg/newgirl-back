@@ -13,13 +13,14 @@ COPY package*.json ./
 # Configure npm to ignore engine warnings and install dependencies
 RUN npm config set engine-strict false && \
     npm ci && \
+    npm install -g @nestjs/cli && \
     npm cache clean --force
 
 # Copy source code
 COPY . .
 
 # Build the application
-RUN npx nest build
+RUN npm run build
 
 # Remove dev dependencies after build to reduce image size
 RUN npm prune --production
