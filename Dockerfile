@@ -10,8 +10,8 @@ COPY . .
 # Install dependencies
 RUN npm install
 
-# Build with TypeScript compiler (no NestJS CLI needed)
-RUN npx tsc
+# Build with local TypeScript compiler
+RUN node_modules/.bin/tsc
 
 # Remove dev dependencies
 RUN npm prune --production
