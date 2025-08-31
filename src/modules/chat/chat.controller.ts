@@ -7,11 +7,15 @@ import {
   Query, 
   UseGuards, 
   Request,
-  Delete
+  Delete,
+  UseInterceptors,
+  UploadedFile
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiConsumes } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ChatService } from './chat.service';
+import { UploadService } from './services/upload.service';
 import { 
   StartChatDto, 
   SendMessageDto, 
@@ -26,7 +30,10 @@ import {
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class ChatController {
-  constructor(private readonly chatService: ChatService) {}
+  constructor(
+    private readonly chatService: ChatService,
+    private readonly uploadService: UploadService
+  ) {}
 
   @Post('start')
   @ApiOperation({ summary: 'Start a new chat session with a girlfriend' })
@@ -211,5 +218,59 @@ export class ChatController {
       limit || 100,
       offset || 0
     );
+  }
+
+  @Post('upload/image')
+  @ApiOperation({ summary: 'Upload an image for chat' })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({ 
+    status: 201, 
+    description: 'Image uploaded successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'Public URL of the uploaded image' },
+        message: { type: 'string' }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Invalid file or upload failed' })
+  @UseInterceptors(FileInterceptor('image'))
+  async uploadImage(
+    @Request() req,
+    @UploadedFile() file: any
+  ): Promise<{ url: string; message: string }> {
+    const url = await this.uploadService.uploadImage(file, req.user.userId);
+    return {
+      url,
+      message: 'Image uploaded successfully'
+    };
+  }
+
+  @Post('upload/audio')
+  @ApiOperation({ summary: 'Upload an audio file for chat' })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({ 
+    status: 201, 
+    description: 'Audio uploaded successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'Public URL of the uploaded audio' },
+        message: { type: 'string' }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Invalid file or upload failed' })
+  @UseInterceptors(FileInterceptor('audio'))
+  async uploadAudio(
+    @Request() req,
+    @UploadedFile() file: any
+  ): Promise<{ url: string; message: string }> {
+    const url = await this.uploadService.uploadAudio(file, req.user.userId);
+    return {
+      url,
+      message: 'Audio uploaded successfully'
+    };
   }
 }

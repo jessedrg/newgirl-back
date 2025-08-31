@@ -18,11 +18,11 @@ export class SendMessageDto {
 
   @ApiProperty({ 
     description: 'Message type', 
-    enum: ['text', 'image', 'emoji'],
+    enum: ['text', 'image', 'audio', 'emoji'],
     default: 'text'
   })
   @IsOptional()
-  @IsEnum(['text', 'image', 'emoji'])
+  @IsEnum(['text', 'image', 'audio', 'emoji'])
   messageType?: string = 'text';
 }
 

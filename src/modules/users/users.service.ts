@@ -24,11 +24,11 @@ export class UsersService {
     
     if (!wallet) {
       try {
-        // Create wallet if it doesn't exist
+        // Create wallet if it doesn't exist with 2 free chat minutes for new users
         wallet = new this.userWalletModel({
           userId: userObjectId,
           balance: {
-            chatMinutes: 0,
+            chatMinutes: 2, // Give new users 2 free chat minutes
             imageCredits: 0,
             tipCredits: 0,
           },

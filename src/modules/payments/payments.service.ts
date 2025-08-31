@@ -43,7 +43,7 @@ export class PaymentsService {
         wallet = new this.userWalletModel({
           userId: userObjectId,
           balance: {
-            chatMinutes: 0,
+            chatMinutes: 2, // Give new users 2 free chat minutes
             imageCredits: 0,
             tipCredits: 0,
           },
