@@ -8,7 +8,10 @@ import { PurchaseMinutesDto, PurchaseMinutesResponseDto, MinutePricingDto } from
 import { PurchaseWithConfirmoDto, ConfirmoPaymentResponseDto, ConfirmoWebhookDto } from './dto/confirmo.dto';
 
 import { ConfirmoService } from './services/confirmo.service';
+import { StripeService } from './services/stripe.service';
 import { User, UserDocument } from '../../schemas/user.schema';
+import { CreateStripePaymentDto, StripePaymentResponseDto } from './dto/stripe.dto';
+import Stripe from 'stripe';
 
 @Injectable()
 export class PaymentsService {
@@ -18,6 +21,7 @@ export class PaymentsService {
     @InjectModel(UserWallet.name) private userWalletModel: Model<UserWalletDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private confirmoService: ConfirmoService,
+    private stripeService: StripeService,
   ) {}
 
   // Get all available payment plans
@@ -399,5 +403,162 @@ export class PaymentsService {
       .exec();
   }
 
+  // Stripe Integration Methods
+
+  // Create Stripe payment intent for purchasing chat minutes
+  async createStripePayment(userId: string, purchaseDto: CreateStripePaymentDto): Promise<StripePaymentResponseDto> {
+    const { quantity, customerEmail } = purchaseDto;
+
+    // Get user information for customer email if not provided
+    let email = customerEmail;
+    if (!email) {
+      const user = await this.userModel.findById(userId);
+      email = user?.email;
+    }
+
+    // Create payment intent with Stripe
+    const paymentIntent = await this.stripeService.createPaymentIntent(
+      userId,
+      quantity,
+      email,
+      {
+        source: 'chat_minutes_purchase'
+      }
+    );
+
+    // Create transaction record in database
+    const transaction = new this.transactionModel({
+      userId: new Types.ObjectId(userId),
+      planId: null, // No plan for direct minute purchases
+      details: {
+        type: 'chat_minutes',
+        quantity,
+        unitPrice: 100, // $1 per minute in cents
+        description: `${quantity} chat minutes at $1.00 per minute`
+      },
+      totalAmount: quantity * 100, // Store in cents
+      currency: 'USD',
+      status: 'pending',
+      provider: {
+        name: 'stripe',
+        paymentMethodId: 'card',
+        transactionId: paymentIntent.id,
+        customerId: userId,
+      },
+    });
+
+    await transaction.save();
+
+    return {
+      paymentIntentId: paymentIntent.id,
+      clientSecret: paymentIntent.client_secret!,
+      quantity,
+      amount: paymentIntent.amount,
+      currency: paymentIntent.currency,
+      status: paymentIntent.status
+    };
+  }
+
+  // Process Stripe webhook events
+  async processStripeWebhook(
+    payload: string | Buffer,
+    signature: string
+  ): Promise<{ success: boolean; message: string }> {
+    const webhookResult = await this.stripeService.processWebhook(payload, signature);
+    
+    if (!webhookResult.success || !webhookResult.event) {
+      return webhookResult;
+    }
+
+    const event = webhookResult.event;
+
+    try {
+      switch (event.type) {
+        case 'payment_intent.succeeded':
+          await this.handleStripePaymentSuccess(event.data.object as Stripe.PaymentIntent);
+          break;
+        
+        case 'payment_intent.payment_failed':
+          await this.handleStripePaymentFailed(event.data.object as Stripe.PaymentIntent);
+          break;
+        
+        default:
+          // Log unhandled event types for debugging
+          console.log(`Unhandled Stripe event type: ${event.type}`);
+      }
+
+      return {
+        success: true,
+        message: `Stripe webhook ${event.type} processed successfully`
+      };
+    } catch (error) {
+      console.error('Error processing Stripe webhook:', error);
+      return {
+        success: false,
+        message: `Failed to process webhook: ${error.message}`
+      };
+    }
+  }
+
+  // Handle successful Stripe payment
+  private async handleStripePaymentSuccess(paymentIntent: Stripe.PaymentIntent): Promise<void> {
+    const transaction = await this.transactionModel.findOne({
+      'provider.transactionId': paymentIntent.id,
+      'provider.name': 'stripe'
+    });
+
+    if (!transaction) {
+      throw new Error(`Transaction not found for payment intent: ${paymentIntent.id}`);
+    }
+
+    if (transaction.creditsApplied) {
+      console.log(`Credits already applied for transaction: ${transaction._id}`);
+      return;
+    }
+
+    // Update transaction status
+    transaction.status = 'completed';
+    transaction.completedAt = new Date();
+    await transaction.save();
+
+    // Add minutes to user wallet
+    const userId = paymentIntent.metadata.userId;
+    const quantity = parseInt(paymentIntent.metadata.quantity);
+
+    if (userId && quantity) {
+      await this.addCreditsToWallet(userId, {
+        chatMinutes: quantity,
+        imageCredits: 0,
+        tipCredits: 0
+      });
+
+      // Mark credits as applied
+      transaction.creditsApplied = true;
+      await transaction.save();
+
+      console.log(`Added ${quantity} chat minutes to user ${userId} wallet`);
+    }
+  }
+
+  // Handle failed Stripe payment
+  private async handleStripePaymentFailed(paymentIntent: Stripe.PaymentIntent): Promise<void> {
+    const transaction = await this.transactionModel.findOne({
+      'provider.transactionId': paymentIntent.id,
+      'provider.name': 'stripe'
+    });
+
+    if (transaction) {
+      transaction.status = 'failed';
+      transaction.failureReason = paymentIntent.last_payment_error?.message || 'Payment failed';
+      await transaction.save();
+      
+      console.log(`Payment failed for transaction: ${transaction._id}`);
+    }
+  }
+
+  // Get Stripe configuration status
+  getStripeStatus(): { configured: boolean; webhookConfigured: boolean } {
+    return this.stripeService.getConfigStatus();
+  }
 
 }

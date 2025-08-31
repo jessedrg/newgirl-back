@@ -15,6 +15,7 @@ import { PaymentsService } from './payments.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PurchaseMinutesDto, PurchaseMinutesResponseDto, MinutePricingDto } from './dto/purchase-minutes.dto';
 import { PurchaseWithConfirmoDto, ConfirmoPaymentResponseDto, ConfirmoWebhookDto } from './dto/confirmo.dto';
+import { CreateStripePaymentDto, StripePaymentResponseDto, StripeWebhookDto } from './dto/stripe.dto';
 
 // DTOs for request/response
 export class CreatePaymentDto {
@@ -182,5 +183,45 @@ export class PaymentsController {
     }
   }
 
+  // Stripe Payment Endpoints
+  @Post('stripe/purchase')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create Stripe payment intent for purchasing chat minutes' })
+  @ApiResponse({ status: 201, description: 'Stripe payment intent created', type: StripePaymentResponseDto })
+  async createStripePayment(
+    @Request() req,
+    @Body() purchaseDto: CreateStripePaymentDto
+  ): Promise<StripePaymentResponseDto> {
+    return this.paymentsService.createStripePayment(req.user.userId, purchaseDto);
+  }
+
+  @Post('webhook/stripe')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Stripe webhook endpoint for payment notifications' })
+  @ApiResponse({ status: 200, description: 'Webhook processed successfully' })
+  async handleStripeWebhook(@Request() req) {
+    try {
+      const signature = req.headers['stripe-signature'];
+      const payload = req.body;
+      
+      if (!signature) {
+        throw new BadRequestException('Missing Stripe signature');
+      }
+
+      const result = await this.paymentsService.processStripeWebhook(payload, signature);
+      return result;
+    } catch (error) {
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  @Get('stripe/status')
+  @ApiOperation({ summary: 'Get Stripe integration status' })
+  @ApiResponse({ status: 200, description: 'Stripe configuration status' })
+  async getStripeStatus() {
+    return this.paymentsService.getStripeStatus();
+  }
 
 }

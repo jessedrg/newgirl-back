@@ -9,6 +9,7 @@ import { User, UserSchema } from '../../schemas/user.schema';
 import { PaymentsController } from './payments.controller';
 import { PaymentsService } from './payments.service';
 import { ConfirmoService } from './services/confirmo.service';
+import { StripeService } from './services/stripe.service';
 
 @Module({
   imports: [
@@ -21,7 +22,7 @@ import { ConfirmoService } from './services/confirmo.service';
     ])
   ],
   controllers: [PaymentsController],
-  providers: [PaymentsService, ConfirmoService],
-  exports: [PaymentsService, ConfirmoService],
+  providers: [PaymentsService, ConfirmoService, StripeService],
+  exports: [PaymentsService, ConfirmoService, StripeService],
 })
 export class PaymentsModule {}

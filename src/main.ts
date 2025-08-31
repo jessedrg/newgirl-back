@@ -34,6 +34,16 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   });
 
+  // Health check endpoint for Heroku
+  app.use('/health', (req, res) => {
+    res.status(200).json({
+      status: 'OK',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || 'development'
+    });
+  });
+
   // Swagger API documentation
   const config = new DocumentBuilder()
     .setTitle('NewGirl Platform API')
