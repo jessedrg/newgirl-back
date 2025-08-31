@@ -1,29 +1,25 @@
 # ---------- BUILD ----------
-FROM node:20-alpine AS build
+FROM node:20.16.0-alpine AS build
 WORKDIR /app
 RUN apk add --no-cache python3 make g++
 
-# Install Yarn for more reliable dependency management
-RUN npm install -g yarn
-
 # Copy package files
-COPY package.json ./
+COPY package.json package-lock.json ./
 
-# Install all dependencies with yarn (more reliable than npm)
-RUN yarn install --production=false
+# Install dependencies
+RUN npm ci --no-audit --no-fund
 
 # Copy source code
 COPY . .
 
 # Build the application
-RUN yarn build
+RUN npm run build
 
-# Install only production dependencies
-RUN rm -rf node_modules
-RUN yarn install --production=true
+# Remove dev dependencies
+RUN npm prune --omit=dev && npm cache clean --force
   
 # ---------- RUNTIME ----------
-FROM node:20-alpine AS runner
+FROM node:20.16.0-alpine AS runner
 WORKDIR /app
 RUN apk add --no-cache dumb-init
 ENV NODE_ENV=production
