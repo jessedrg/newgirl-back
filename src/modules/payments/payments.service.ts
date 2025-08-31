@@ -34,25 +34,38 @@ export class PaymentsService {
 
   // Get user's wallet information
   async getUserWallet(userId: string): Promise<UserWalletDocument> {
-    let wallet = await this.userWalletModel.findOne({ userId }).exec();
+    // Ensure userId is properly formatted as ObjectId for query
+    const userObjectId = new Types.ObjectId(userId);
+    let wallet = await this.userWalletModel.findOne({ userId: userObjectId }).exec();
     
     if (!wallet) {
-      // Create wallet if it doesn't exist
-      wallet = new this.userWalletModel({
-        userId: new Types.ObjectId(userId),
-        balance: {
-          chatMinutes: 0,
-          imageCredits: 0,
-          tipCredits: 0,
-        },
-        usage: {
-          totalChatMinutesUsed: 0,
-          totalImagesGenerated: 0,
-          totalTipsGiven: 0,
-          totalSpent: 0,
-        },
-      });
-      await wallet.save();
+      try {
+        wallet = new this.userWalletModel({
+          userId: userObjectId,
+          balance: {
+            chatMinutes: 0,
+            imageCredits: 0,
+            tipCredits: 0,
+          },
+          usage: {
+            totalChatMinutesUsed: 0,
+            totalImagesGenerated: 0,
+            totalTipsGiven: 0,
+            totalSpent: 0,
+          },
+        });
+        await wallet.save();
+      } catch (error) {
+        if (error.code === 11000) {
+          // Handle duplicate key error - wallet was created by another request
+          wallet = await this.userWalletModel.findOne({ userId: userObjectId }).exec();
+          if (!wallet) {
+            throw new Error(`Failed to create or find user wallet for userId: ${userId}`);
+          }
+        } else {
+          throw error;
+        }
+      }
     }
     
     return wallet;
