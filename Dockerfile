@@ -3,26 +3,24 @@ FROM node:20-alpine AS build
 WORKDIR /app
 RUN apk add --no-cache python3 make g++
 
-# Update npm to latest version
-RUN npm install -g npm@11.5.2
+# Install Yarn for more reliable dependency management
+RUN npm install -g yarn
 
 # Copy package files
-COPY package.json package-lock.json ./
+COPY package.json ./
 
-# Install only production dependencies first
-RUN npm ci --only=production --no-audit --no-fund || npm install --only=production --no-audit --no-fund
-
-# Install dev dependencies for build
-RUN npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+# Install all dependencies with yarn (more reliable than npm)
+RUN yarn install --production=false
 
 # Copy source code
 COPY . .
 
 # Build the application
-RUN npm run build
+RUN yarn build
 
-# Remove dev dependencies manually to avoid npm prune issues
-RUN rm -rf node_modules && npm ci --only=production --no-audit --no-fund
+# Install only production dependencies
+RUN rm -rf node_modules
+RUN yarn install --production=true
   
 # ---------- RUNTIME ----------
 FROM node:20-alpine AS runner
