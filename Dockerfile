@@ -13,8 +13,8 @@ RUN npm ci --only=production=false
 # Copy source code
 COPY . .
 
-# Build the application
-RUN npm run build
+# Build the application using TypeScript compiler directly
+RUN npx tsc
 
 # Production stage
 FROM node:18-alpine AS production
