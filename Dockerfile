@@ -3,6 +3,9 @@ FROM node:20-alpine AS build
 WORKDIR /app
 RUN apk add --no-cache python3 make g++
 
+# Update npm to latest version
+RUN npm install -g npm@11.5.2
+
 # Copy package files
 COPY package.json package-lock.json ./
 
