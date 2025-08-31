@@ -10,14 +10,8 @@ COPY . .
 # Install dependencies
 RUN npm install
 
-# Build with TypeScript compiler using npx
-RUN npx --package=typescript tsc
-
-# Remove dev dependencies
-RUN npm prune --production
-
 # Expose port
 EXPOSE 3003
 
-# Start the application
-CMD ["node", "dist/main"]
+# Start the application in development mode
+CMD ["npm", "run", "start:dev"]
