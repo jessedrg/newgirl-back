@@ -22,8 +22,8 @@ RUN npm cache clean --force
 # Copy source code
 COPY . .
 
-# Build the application using local nest binary
-RUN ./node_modules/.bin/nest build
+# Build the application using npx to ensure CLI is found
+RUN npx --yes @nestjs/cli build
 
 # Remove dev dependencies after build to reduce image size
 RUN npm prune --production --no-audit
