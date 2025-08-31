@@ -9,8 +9,11 @@ RUN npm install -g npm@11.5.2
 # Copy package files
 COPY package.json package-lock.json ./
 
-# Clean install with fallback to regular install
-RUN npm ci --no-audit --no-fund || (rm -rf node_modules package-lock.json && npm install --no-audit --no-fund)
+# Install only production dependencies first
+RUN npm ci --only=production --no-audit --no-fund || npm install --only=production --no-audit --no-fund
+
+# Install dev dependencies for build
+RUN npm ci --no-audit --no-fund || npm install --no-audit --no-fund
 
 # Copy source code
 COPY . .
@@ -18,8 +21,8 @@ COPY . .
 # Build the application
 RUN npm run build
 
-# Clean up dev dependencies
-RUN npm prune --omit=dev && npm cache clean --force
+# Remove dev dependencies manually to avoid npm prune issues
+RUN rm -rf node_modules && npm ci --only=production --no-audit --no-fund
   
 # ---------- RUNTIME ----------
 FROM node:20-alpine AS runner
