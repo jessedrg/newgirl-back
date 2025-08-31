@@ -4,19 +4,16 @@ FROM node:20-alpine
 # Set working directory
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
-
-# Install all dependencies (including dev for build)
-RUN npm install
-
-# Copy source code
+# Copy everything
 COPY . .
 
-# Build the application using npx to ensure CLI is available
-RUN npx nest build
+# Install dependencies
+RUN npm install
 
-# Remove dev dependencies AFTER build
+# Build with TypeScript compiler (no NestJS CLI needed)
+RUN npx tsc
+
+# Remove dev dependencies
 RUN npm prune --production
 
 # Expose port
