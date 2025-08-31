@@ -66,9 +66,17 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       let userType: 'user' | 'admin';
       
       try {
+        console.log('🔑 ChatGateway - JWT_SECRET exists:', !!process.env.JWT_SECRET);
+        console.log('🔑 ChatGateway - JWT_SECRET length:', process.env.JWT_SECRET?.length || 0);
+        console.log('🔑 ChatGateway - Token length:', token.length);
+        console.log('🔑 ChatGateway - Token preview:', token.substring(0, 50) + '...');
+        
         decoded = this.jwtService.verify(token);
+        console.log('✅ ChatGateway - Token verified successfully:', { userId: decoded.userId, adminId: decoded.adminId });
         userType = decoded.adminId ? 'admin' : 'user';
       } catch (error) {
+        console.error('❌ ChatGateway - Token verification failed:', error.message);
+        console.error('❌ ChatGateway - Token that failed:', token.substring(0, 50) + '...');
         this.logger.error('Invalid token:', error.message);
         client.disconnect();
         return;
@@ -274,13 +282,25 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('send_message')
   async handleSendMessage(
     @ConnectedSocket() client: AuthenticatedSocket,
-    @MessageBody() data: { sessionId: string; content: string; messageType?: string }
+    @MessageBody() data: { sessionId: string; content?: string; messageType?: string; mediaUrl?: string }
   ) {
     try {
-      const { sessionId, content, messageType = 'text' } = data;
+      const { sessionId, content, messageType = 'text', mediaUrl } = data;
 
       if (!client.sessionId || client.sessionId !== sessionId) {
         client.emit('error', { message: 'Not joined to this session' });
+        return;
+      }
+
+      // For image/audio messages, use mediaUrl as content if content is empty
+      let messageContent = content;
+      if (!messageContent && (messageType === 'image' || messageType === 'audio') && mediaUrl) {
+        messageContent = mediaUrl;
+      }
+
+      // Validate that we have content for the message
+      if (!messageContent) {
+        client.emit('error', { message: 'Message content is required' });
         return;
       }
 
@@ -292,7 +312,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         // User sending message
         message = await this.chatService.sendMessage(client.userId, {
           sessionId,
-          content,
+          content: messageContent,
           messageType
         });
 
@@ -309,7 +329,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         // Admin sending message (as girlfriend)
         message = await this.sendAdminMessage(client.adminId, {
           sessionId,
-          content,
+          content: messageContent,
           messageType,
           senderType: 'girlfriend' // Admin impersonates girlfriend
         });

@@ -161,8 +161,7 @@ export class User {
 export type UserDocument = User & Document;
 export const UserSchema = SchemaFactory.createForClass(User);
 
-// Create indexes
-UserSchema.index({ email: 1 }, { unique: true });
+// Create indexes (email index already created via @Prop unique: true)
 UserSchema.index({ status: 1 });
 UserSchema.index({ createdAt: -1 });
 UserSchema.index({ lastLoginAt: -1 });

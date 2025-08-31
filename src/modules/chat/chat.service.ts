@@ -44,18 +44,33 @@ export class ChatService {
       return this.formatChatSession(existingSession, girlfriend);
     }
 
-    // Create new chat session
-    const newSession = new this.chatSessionModel({
-      userId: new Types.ObjectId(userId),
-      girlfriendId: new Types.ObjectId(startChatDto.girlfriendId),
-      status: 'active',
-      startedAt: new Date(),
-      lastActivity: new Date(),
-    });
+    // Create new chat session with duplicate handling
+    try {
+      const newSession = new this.chatSessionModel({
+        userId: new Types.ObjectId(userId),
+        girlfriendId: new Types.ObjectId(startChatDto.girlfriendId),
+        status: 'active',
+        startedAt: new Date(),
+        lastActivity: new Date(),
+      });
 
-    await newSession.save();
-
-    return this.formatChatSession(newSession, girlfriend);
+      await newSession.save();
+      return this.formatChatSession(newSession, girlfriend);
+    } catch (error) {
+      // Handle duplicate key error - fetch existing session
+      if (error.code === 11000) {
+        const existingSession = await this.chatSessionModel.findOne({
+          userId: new Types.ObjectId(userId),
+          girlfriendId: new Types.ObjectId(startChatDto.girlfriendId),
+          status: 'active'
+        });
+        
+        if (existingSession) {
+          return this.formatChatSession(existingSession, girlfriend);
+        }
+      }
+      throw error;
+    }
   }
 
   // Send a message in a chat session
@@ -75,6 +90,11 @@ export class ChatService {
     const wallet = await this.userWalletModel.findOne({ userId: new Types.ObjectId(userId) });
     if (!wallet || wallet.balance.chatMinutes <= 0) {
       throw new BadRequestException('Insufficient chat minutes');
+    }
+
+    // Validate content is provided
+    if (!sendMessageDto.content) {
+      throw new BadRequestException('Message content is required');
     }
 
     // Create message

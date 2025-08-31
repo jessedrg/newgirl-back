@@ -8,11 +8,15 @@ import {
   Request,
   Delete,
   Put,
-  Query
+  Query,
+  UseInterceptors,
+  UploadedFile
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
 import { AdminAuthGuard } from './guards/admin-auth.guard';
+import { UploadService } from '../chat/services/upload.service';
 import { 
   AdminLoginDto, 
   AdminProfileDto, 
@@ -25,7 +29,10 @@ import {
 @ApiTags('admin')
 @Controller('admin')
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly uploadService: UploadService
+  ) {}
 
   @Post('login')
   @ApiOperation({ summary: 'Admin login' })
@@ -184,5 +191,73 @@ export class AdminController {
     @Query('offset') offset?: number
   ): Promise<any> {
     return this.adminService.getAdminChatHistory(sessionId, limit || 50, offset || 0);
+  }
+
+  @Post('chat/upload/image')
+  @UseGuards(AdminAuthGuard)
+  @ApiBearerAuth()
+  @UseInterceptors(FileInterceptor('image'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Upload image for admin chat' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Image uploaded successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string' },
+        filename: { type: 'string' }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Invalid file or upload failed' })
+  async uploadImage(
+    @UploadedFile() file: any,
+    @Body('sessionId') sessionId: string,
+    @Body('senderType') senderType: string
+  ) {
+    if (!file) {
+      throw new Error('No file provided');
+    }
+    
+    const url = await this.uploadService.uploadImage(file, sessionId);
+    return {
+      url: url,
+      filename: file.originalname || 'uploaded-image'
+    };
+  }
+
+  @Post('chat/upload/audio')
+  @UseGuards(AdminAuthGuard)
+  @ApiBearerAuth()
+  @UseInterceptors(FileInterceptor('audio'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Upload audio for admin chat' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Audio uploaded successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string' },
+        filename: { type: 'string' }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Invalid file or upload failed' })
+  async uploadAudio(
+    @UploadedFile() file: any,
+    @Body('sessionId') sessionId: string,
+    @Body('senderType') senderType: string
+  ) {
+    if (!file) {
+      throw new Error('No file provided');
+    }
+    
+    const url = await this.uploadService.uploadAudio(file, sessionId);
+    return {
+      url: url,
+      filename: file.originalname || 'uploaded-audio'
+    };
   }
 }

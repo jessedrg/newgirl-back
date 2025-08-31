@@ -12,9 +12,10 @@ export class SendMessageDto {
   @IsMongoId()
   sessionId: string;
 
-  @ApiProperty({ description: 'Message content' })
+  @ApiProperty({ description: 'Message content (optional for image/audio messages)' })
+  @IsOptional()
   @IsString()
-  content: string;
+  content?: string;
 
   @ApiProperty({ 
     description: 'Message type', 

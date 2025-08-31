@@ -6,6 +6,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 import { AdminJwtStrategy } from './strategies/admin-jwt.strategy';
+import { UploadService } from '../chat/services/upload.service';
 import { Admin, AdminSchema } from '../../schemas/admin.schema';
 import { ChatSession, ChatSessionSchema } from '../../schemas/chat-session.schema';
 import { ChatMessage, ChatMessageSchema } from '../../schemas/chat-message.schema';
@@ -34,7 +35,7 @@ import { UserWallet, UserWalletSchema } from '../../schemas/user-wallet.schema';
     }),
   ],
   controllers: [AdminController],
-  providers: [AdminService, AdminJwtStrategy],
+  providers: [AdminService, AdminJwtStrategy, UploadService],
   exports: [AdminService],
 })
 export class AdminModule {}

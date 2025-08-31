@@ -207,6 +207,8 @@ export class AuthService {
     // Generate tokens
     const payload = { userId: user._id, email: user.email };
     console.log('🔐 AuthService - Generating token with payload:', payload);
+    console.log('🔑 JWT_SECRET exists:', !!process.env.JWT_SECRET);
+    console.log('🔑 JWT_SECRET length:', process.env.JWT_SECRET?.length || 0);
     const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
     console.log('✅ AuthService - Token generated successfully');
     const refreshToken = this.jwtService.sign(

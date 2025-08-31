@@ -18,10 +18,10 @@ export class ChatMessage {
   })
   senderType: string;
 
-  @Prop({ type: String, required: true })
+  @Prop({ type: String, required: false })
   content: string;
 
-  @Prop({ type: String, enum: ['text', 'image', 'emoji'], default: 'text' })
+  @Prop({ type: String, enum: ['text', 'image', 'emoji', 'audio'], default: 'text' })
   messageType: string;
 
   @Prop({ type: Boolean, default: false })
