@@ -13,14 +13,14 @@ RUN npm install
 # Copy source code
 COPY . .
 
-# Build the application
-RUN npm run build
+# Build the application using npx to ensure CLI is available
+RUN npx nest build
 
-# Remove dev dependencies
+# Remove dev dependencies AFTER build
 RUN npm prune --production
 
 # Expose port
-EXPOSE 3000
+EXPOSE 3003
 
 # Start the application
 CMD ["node", "dist/main"]
