@@ -13,5 +13,5 @@ RUN npm install
 # Expose port
 EXPOSE 3003
 
-# Start the application using npx to ensure nest CLI is found
-CMD ["npx", "nest", "start", "--watch"]
+# Start the application directly with ts-node
+CMD ["node_modules/.bin/ts-node", "src/main.ts"]
