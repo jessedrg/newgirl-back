@@ -16,17 +16,14 @@ RUN npm config set engine-strict false
 # Install dependencies with retry logic
 RUN npm ci --no-audit --no-fund || npm ci --no-audit --no-fund
 
-# Install NestJS CLI globally
-RUN npm install -g @nestjs/cli
-
 # Clean npm cache
 RUN npm cache clean --force
 
 # Copy source code
 COPY . .
 
-# Build the application with error handling
-RUN npm run build || (echo "Build failed, trying with npx..." && npx nest build)
+# Build the application using local nest binary
+RUN ./node_modules/.bin/nest build
 
 # Remove dev dependencies after build to reduce image size
 RUN npm prune --production --no-audit
