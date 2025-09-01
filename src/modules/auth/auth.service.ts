@@ -384,6 +384,61 @@ export class AuthService {
     };
   }
 
+  async handleGoogleCallback(code: string, state?: string): Promise<any> {
+    try {
+      // Exchange authorization code for access token
+      const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          client_id: process.env.GOOGLE_CLIENT_ID,
+          client_secret: process.env.GOOGLE_CLIENT_SECRET,
+          code: code,
+          grant_type: 'authorization_code',
+          redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+        }),
+      });
+
+      const tokenData = await tokenResponse.json();
+
+      if (!tokenResponse.ok) {
+        throw new Error(`Token exchange failed: ${tokenData.error_description}`);
+      }
+
+      // Get user profile from Google
+      const profileResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: {
+          Authorization: `Bearer ${tokenData.access_token}`,
+        },
+      });
+
+      const profile = await profileResponse.json();
+
+      if (!profileResponse.ok) {
+        throw new Error('Failed to fetch user profile');
+      }
+
+      // Create user object in the format expected by validateOAuthUser
+      const oauthUser = {
+        googleId: profile.id,
+        email: profile.email,
+        firstName: profile.given_name,
+        lastName: profile.family_name,
+        picture: profile.picture,
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token,
+      };
+
+      // Use existing validateOAuthUser method
+      return await this.validateOAuthUser(oauthUser, 'google');
+    } catch (error) {
+      console.error('Google OAuth callback error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
   async validateOAuthUser(oauthUser: any, provider: string): Promise<any> {
     const { email, firstName, lastName, picture, googleId } = oauthUser;
 

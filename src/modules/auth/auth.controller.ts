@@ -116,7 +116,7 @@ export class AuthController {
 
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
-  @ApiOperation({ summary: 'Handle Google OAuth callback' })
+  @ApiOperation({ summary: 'Handle Google OAuth callback (GET)' })
   @ApiResponse({ status: 302, description: 'Redirect to frontend with tokens or error' })
   async googleAuthCallback(@Req() req: any, @Res() res: Response) {
     try {
@@ -136,6 +136,41 @@ export class AuthController {
       }
     } catch (error) {
       console.error('Google OAuth callback error:', error);
+      return res.redirect(`${process.env.FRONTEND_URL}/auth/error?error=oauth_failed`);
+    }
+  }
+
+  @Post('google/callback')
+  @ApiOperation({ summary: 'Handle Google OAuth callback (POST)' })
+  @ApiResponse({ status: 302, description: 'Redirect to frontend with tokens or error' })
+  async googleAuthCallbackPost(@Req() req: any, @Res() res: Response, @Body() body: any) {
+    try {
+      console.log('POST callback body:', body);
+      
+      // Extract code from POST body
+      const { code, state } = body;
+      
+      if (!code) {
+        return res.redirect(`${process.env.FRONTEND_URL}/auth/error?error=missing_code`);
+      }
+
+      // Manually exchange code for tokens and create user
+      // We'll bypass Passport and handle this directly
+      const result = await this.authService.handleGoogleCallback(code, state);
+      
+      if (result.success) {
+        const queryParams = new URLSearchParams({
+          access_token: result.accessToken,
+          refresh_token: result.refreshToken,
+          expires_in: result.expiresIn.toString()
+        });
+        
+        return res.redirect(`${process.env.FRONTEND_URL}/auth/callback?${queryParams.toString()}`);
+      } else {
+        return res.redirect(`${process.env.FRONTEND_URL}/auth/error?error=oauth_failed`);
+      }
+    } catch (error) {
+      console.error('Google OAuth POST callback error:', error);
       return res.redirect(`${process.env.FRONTEND_URL}/auth/error?error=oauth_failed`);
     }
   }
