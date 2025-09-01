@@ -3,8 +3,8 @@ FROM node:20.16.0-alpine AS build
 WORKDIR /app
 RUN apk add --no-cache python3 make g++
 
-# Install Yarn globally for more reliable dependency management
-RUN npm install -g yarn typescript@5.1.3
+# Install TypeScript globally (yarn is already available in Node.js image)
+RUN npm install -g typescript@5.1.3
 
 # Copy package files
 COPY package.json ./
