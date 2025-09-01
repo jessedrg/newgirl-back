@@ -3,23 +3,24 @@ FROM node:20.16.0-alpine AS build
 WORKDIR /app
 RUN apk add --no-cache python3 make g++
 
-# Install TypeScript globally to ensure tsc is available
-RUN npm install -g typescript@5.1.3
+# Install Yarn globally for more reliable dependency management
+RUN npm install -g yarn typescript@5.1.3
 
 # Copy package files
-COPY package.json package-lock.json ./
+COPY package.json ./
 
-# Install dependencies with fallback - include dev dependencies for build
-RUN npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+# Install dependencies with yarn (avoids npm exit handler bug)
+RUN yarn install --production=false
 
 # Copy source code
 COPY . .
 
 # Build the application
-RUN npm run build
+RUN yarn build
 
-# Remove dev dependencies
-RUN npm prune --omit=dev && npm cache clean --force
+# Install only production dependencies
+RUN rm -rf node_modules
+RUN yarn install --production=true
   
 # ---------- RUNTIME ----------
 FROM node:20.16.0-alpine AS runner

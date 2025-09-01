@@ -84,7 +84,7 @@ export class StripeService {
    * Process Stripe webhook events with proper signature verification
    */
   async processWebhook(
-    payload: string | NodeJS.ArrayBufferView,
+    payload: string | any,
     signature: string
   ): Promise<{ success: boolean; event?: Stripe.Event; message: string }> {
     if (!this.stripe) {

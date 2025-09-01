@@ -474,7 +474,7 @@ export class PaymentsService {
 
   // Process Stripe webhook events
   async processStripeWebhook(
-    payload: string | NodeJS.ArrayBufferView,
+    payload: string | any,
     signature: string
   ): Promise<{ success: boolean; message: string }> {
     const webhookResult = await this.stripeService.processWebhook(payload, signature);
