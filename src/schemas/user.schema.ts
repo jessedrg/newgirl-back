@@ -93,6 +93,32 @@ export class Security {
   lockedUntil: Date;
 }
 
+// OAuth provider subdocument
+@Schema({ _id: false })
+export class OAuthProvider {
+  @Prop({ required: true })
+  id: string;
+
+  @Prop({ required: true })
+  email: string;
+
+  @Prop({ default: true })
+  verified: boolean;
+}
+
+// OAuth subdocument
+@Schema({ _id: false })
+export class OAuth {
+  @Prop({ type: OAuthProvider })
+  google?: OAuthProvider;
+
+  @Prop({ type: OAuthProvider })
+  facebook?: OAuthProvider;
+
+  @Prop({ type: OAuthProvider })
+  apple?: OAuthProvider;
+}
+
 // Subscription subdocument
 @Schema({ _id: false })
 export class Subscription {
@@ -147,6 +173,9 @@ export class User {
 
   @Prop({ type: Security })
   security: Security;
+
+  @Prop({ type: OAuth })
+  oauth: OAuth;
 
   @Prop({ type: Subscription })
   subscription: Subscription;

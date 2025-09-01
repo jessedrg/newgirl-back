@@ -1,6 +1,7 @@
 import { Controller, Post, Get, Body, Query, Param, UseGuards, Req, Res } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ThrottlerGuard } from '@nestjs/throttler';
+import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { 
   RegisterDto, 
@@ -103,6 +104,40 @@ export class AuthController {
       authUrl: result.authUrl,
       state: result.state
     };
+  }
+
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  @ApiOperation({ summary: 'Initiate Google OAuth login' })
+  @ApiResponse({ status: 302, description: 'Redirect to Google OAuth' })
+  async googleAuth(@Req() req: Request) {
+    // Guard redirects to Google
+  }
+
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  @ApiOperation({ summary: 'Handle Google OAuth callback' })
+  @ApiResponse({ status: 302, description: 'Redirect to frontend with tokens or error' })
+  async googleAuthCallback(@Req() req: any, @Res() res: Response) {
+    try {
+      const result = req.user;
+      
+      if (result.success) {
+        // Redirect to frontend with tokens
+        const queryParams = new URLSearchParams({
+          access_token: result.accessToken,
+          refresh_token: result.refreshToken,
+          expires_in: result.expiresIn.toString()
+        });
+        
+        return res.redirect(`${process.env.FRONTEND_URL}/auth/callback?${queryParams.toString()}`);
+      } else {
+        return res.redirect(`${process.env.FRONTEND_URL}/auth/error?error=oauth_failed`);
+      }
+    } catch (error) {
+      console.error('Google OAuth callback error:', error);
+      return res.redirect(`${process.env.FRONTEND_URL}/auth/error?error=oauth_failed`);
+    }
   }
 
   @Get('oauth/:provider/callback')

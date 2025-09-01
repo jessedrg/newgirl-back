@@ -384,6 +384,94 @@ export class AuthService {
     };
   }
 
+  async validateOAuthUser(oauthUser: any, provider: string): Promise<any> {
+    const { email, firstName, lastName, picture, googleId } = oauthUser;
+
+    // Check if user already exists
+    let user = await this.userModel.findOne({ email }).exec();
+
+    if (user) {
+      // Update OAuth info if user exists
+      if (provider === 'google' && !user.oauth?.google?.id) {
+        user.oauth = {
+          ...user.oauth,
+          google: {
+            id: googleId,
+            email: email,
+            verified: true
+          }
+        };
+        await user.save();
+      }
+    } else {
+      // Create new user from OAuth
+      user = new this.userModel({
+        email,
+        profile: {
+          firstName,
+          lastName,
+          displayName: `${firstName} ${lastName}`,
+          avatar: picture,
+        },
+        oauth: {
+          [provider]: {
+            id: googleId,
+            email: email,
+            verified: true
+          }
+        },
+        status: 'active',
+        emailVerified: true, // OAuth emails are pre-verified
+        preferences: {
+          language: 'en-US',
+          theme: 'dark',
+          privacy: {
+            profileVisibility: 'private',
+            showOnlineStatus: false,
+            allowDataExport: true
+          },
+          notifications: {
+            email: true,
+            push: true,
+            marketing: false,
+            newFeatures: true
+          }
+        },
+        security: {
+          twoFactorEnabled: false,
+          lastPasswordChange: new Date(),
+          failedLoginAttempts: 0
+        }
+      });
+
+      await user.save();
+    }
+
+    // Generate tokens
+    const payload = { userId: user._id, email: user.email };
+    const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
+    const refreshToken = this.jwtService.sign(
+      { ...payload, type: 'refresh' },
+      { expiresIn: '7d' }
+    );
+
+    return {
+      success: true,
+      accessToken,
+      refreshToken,
+      user: {
+        id: user._id.toString(),
+        email: user.email,
+        profile: user.profile
+      },
+      subscription: {
+        tier: 'free',
+        status: 'active'
+      },
+      expiresIn: 900
+    };
+  }
+
   async initiateOAuth(provider: string, redirectUrl?: string): Promise<{ authUrl: string; state: string }> {
     const state = uuidv4();
     
