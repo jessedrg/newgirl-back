@@ -9,7 +9,7 @@ RUN npm install -g typescript@5.1.3
 # Copy package files
 COPY package.json package-lock.json ./
 
-# Install dependencies with fallback
+# Install dependencies with fallback - include dev dependencies for build
 RUN npm ci --no-audit --no-fund || npm install --no-audit --no-fund
 
 # Copy source code
