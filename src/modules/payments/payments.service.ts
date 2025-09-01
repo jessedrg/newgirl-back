@@ -1,7 +1,4 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-
-// Type alias to make Buffer publicly accessible
-type PayloadBuffer = Buffer;
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { PaymentPlan, PaymentPlanDocument } from '../../schemas/payment-plan.schema';
@@ -477,7 +474,7 @@ export class PaymentsService {
 
   // Process Stripe webhook events
   async processStripeWebhook(
-    payload: string | PayloadBuffer,
+    payload: string | NodeJS.ArrayBufferView,
     signature: string
   ): Promise<{ success: boolean; message: string }> {
     const webhookResult = await this.stripeService.processWebhook(payload, signature);

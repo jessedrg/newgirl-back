@@ -2,9 +2,6 @@ import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 
-// Type alias to make Buffer publicly accessible
-type PayloadBuffer = Buffer;
-
 @Injectable()
 export class StripeService {
   private readonly logger = new Logger(StripeService.name);
@@ -87,7 +84,7 @@ export class StripeService {
    * Process Stripe webhook events with proper signature verification
    */
   async processWebhook(
-    payload: string | PayloadBuffer,
+    payload: string | NodeJS.ArrayBufferView,
     signature: string
   ): Promise<{ success: boolean; event?: Stripe.Event; message: string }> {
     if (!this.stripe) {
