@@ -35,14 +35,14 @@ interface AuthenticatedSocket extends Socket {
   },
   namespace: '/chat',
 })
-export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
   private readonly logger = new Logger(ChatGateway.name);
-  private connectedUsers = new Map<string, AuthenticatedSocket>();
-  private connectedAdmins = new Map<string, AuthenticatedSocket>();
-  private sessionConnections = new Map<string, { user?: AuthenticatedSocket; admin?: AuthenticatedSocket }>();
+  private sessionConnections = new Map<string, SessionConnection>();
+  private connectedAdmins = new Set<string>();
+  private recentNotifications = new Set<string>();
   private billingIntervals = new Map<string, NodeJS.Timeout>(); // Track billing intervals per session
 
   constructor(
@@ -922,11 +922,22 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // Check if no admin is connected and send SMS notifications to offline admins
   private async checkAndNotifyAdminsIfNeeded(sessionId: string): Promise<void> {
     try {
-      // Check if any admin is currently connected to this session
-      const sessionConn = this.sessionConnections.get(sessionId);
-      const hasConnectedAdmin = sessionConn?.admin && sessionConn.admin.connected;
+      this.logger.log(`Checking if SMS notification needed for session ${sessionId}`);
 
-      if (hasConnectedAdmin) {
+      // Create a unique notification key to prevent duplicates
+      const notificationKey = `session-${sessionId}`;
+      
+      // Check if we already sent a notification for this session recently (within 5 minutes)
+      if (this.recentNotifications.has(notificationKey)) {
+        this.logger.log(`[SMS NOTIFICATION] Already sent notification for session ${sessionId} recently, skipping`);
+        return;
+      }
+
+      // Check if any admin is connected to this specific session
+      const sessionConn = this.sessionConnections.get(sessionId);
+      const hasAdminInSession = sessionConn?.admin !== null;
+      
+      if (hasAdminInSession) {
         this.logger.log(`Admin already connected to session ${sessionId}, no SMS needed`);
         return;
       }
@@ -939,6 +950,17 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return;
       }
 
+      this.logger.log(`[SMS NOTIFICATION] No admins online - proceeding with SMS notifications for session ${sessionId}`);
+
+      // Mark this session as notified to prevent duplicates
+      this.recentNotifications.add(notificationKey);
+      
+      // Remove the notification key after 5 minutes to allow future notifications
+      setTimeout(() => {
+        this.recentNotifications.delete(notificationKey);
+        this.logger.log(`[SMS NOTIFICATION] Cleared notification lock for session ${sessionId}`);
+      }, 5 * 60 * 1000); // 5 minutes
+
       // No admins online - send SMS notifications
       this.logger.log(`No admins online for session ${sessionId}, sending SMS notifications`);
 
@@ -949,15 +971,20 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         smsNotificationsEnabled: true
       }).select('phoneNumber name');
 
+      this.logger.log(`[SMS NOTIFICATION] Found ${adminsToNotify.length} admins in database with SMS enabled`);
+      this.logger.log(`[SMS NOTIFICATION] Admin details:`, adminsToNotify.map(admin => ({ name: admin.name, phone: admin.phoneNumber })));
+
       if (adminsToNotify.length === 0) {
-        this.logger.warn('No admins configured for SMS notifications');
+        this.logger.warn('[SMS NOTIFICATION] No admins configured for SMS notifications');
         return;
       }
 
       const phoneNumbers = adminsToNotify.map(admin => admin.phoneNumber).filter(Boolean);
       
+      this.logger.log(`[SMS NOTIFICATION] Valid phone numbers extracted:`, phoneNumbers);
+      
       if (phoneNumbers.length === 0) {
-        this.logger.warn('No valid phone numbers found for admin notifications');
+        this.logger.warn('[SMS NOTIFICATION] No valid phone numbers found for admin notifications');
         return;
       }
 
@@ -968,12 +995,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const message = `🚨 NewGirl Alert: ${userName} has started a new chat session and needs assistance! Please log in to the admin panel to respond.`;
 
       // Send SMS notifications
+      this.logger.log(`[SMS NOTIFICATION] Attempting to send SMS to ${phoneNumbers.length} phone numbers`);
+      this.logger.log(`[SMS NOTIFICATION] Message content: ${message}`);
+      
       await this.twilioService.sendAdminNotification(phoneNumbers, message);
-
-      this.logger.log(`SMS notifications sent to ${phoneNumbers.length} admins for session ${sessionId}`);
-
+      this.logger.log(`[SMS NOTIFICATION] ✅ SMS notifications sent successfully to ${phoneNumbers.length} admins for session ${sessionId}`);
     } catch (error) {
-      this.logger.error(`Failed to send admin SMS notifications for session ${sessionId}:`, error);
+      this.logger.error(`[SMS NOTIFICATION] ❌ Failed to send SMS notifications for session ${sessionId}:`, error);
+      this.logger.error(`[SMS NOTIFICATION] Error details:`, error.message || error);
     }
   }
 }

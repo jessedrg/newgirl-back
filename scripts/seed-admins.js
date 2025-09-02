@@ -18,6 +18,8 @@ const adminSchema = new mongoose.Schema({
   activeChatSessions: { type: Number, default: 0 },
   maxConcurrentChats: { type: Number, default: 5 },
   specialties: { type: [String], default: [] },
+  phoneNumber: { type: String, default: null }, // Phone number for SMS notifications
+  smsNotificationsEnabled: { type: Boolean, default: true }, // Whether to receive SMS notifications
   stats: {
     totalChatsHandled: { type: Number, default: 0 },
     averageResponseTime: { type: Number, default: 0 },
@@ -35,35 +37,43 @@ const adminAccounts = [
     password: 'admin123!',
     name: 'Super Admin',
     role: 'super_admin',
-    specialties: ['management', 'support', 'technical']
+    specialties: ['management', 'support', 'technical'],
+    phoneNumber: '+34611189371',
+    smsNotificationsEnabled: true
   },
   {
     email: 'chat1@newgirl.com',
     password: 'chat123!',
     name: 'Emma Chat Admin',
     role: 'chat_admin',
-    specialties: ['music', 'travel', 'lifestyle']
+    specialties: ['music', 'travel', 'lifestyle'],
+    phoneNumber: null,
+    smsNotificationsEnabled: false
   },
   {
     email: 'chat2@newgirl.com',
     password: 'chat123!',
     name: 'Sophia Chat Admin',
     role: 'chat_admin',
-    specialties: ['art', 'books', 'nature']
+    specialties: ['art', 'books', 'nature'],
+    phoneNumber: null,
+    smsNotificationsEnabled: false
   },
   {
     email: 'support@newgirl.com',
     password: 'support123!',
     name: 'Support Admin',
     role: 'support_admin',
-    specialties: ['customer_service', 'billing', 'technical_support']
+    specialties: ['customer_service', 'billing', 'technical_support'],
+    phoneNumber: null,
+    smsNotificationsEnabled: false
   }
 ];
 
 async function seedAdmins() {
   try {
     // Connect to MongoDB
-    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/newgirl';
+    const mongoUri = process.env.MONGODB_URI || '';
     await mongoose.connect(mongoUri);
     console.log('✅ Connected to MongoDB');
 

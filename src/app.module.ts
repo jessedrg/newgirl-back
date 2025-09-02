@@ -13,6 +13,7 @@ import { EmailModule } from './modules/email/email.module';
 import { UsersModule } from './modules/users/users.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { AdminModule } from './modules/admin/admin.module';
     UsersModule,
     ChatModule,
     AdminModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
