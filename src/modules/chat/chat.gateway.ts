@@ -2,6 +2,7 @@ import {
   WebSocketGateway,
   WebSocketServer,
   SubscribeMessage,
+  OnGatewayInit,
   OnGatewayConnection,
   OnGatewayDisconnect,
   MessageBody,
@@ -27,6 +28,12 @@ interface AuthenticatedSocket extends Socket {
   sessionId?: string;
 }
 
+interface SessionConnection {
+  user: AuthenticatedSocket | null;
+  admin: AuthenticatedSocket | null;
+  sessionId: string;
+}
+
 @Injectable()
 @WebSocketGateway({
   cors: {
@@ -41,7 +48,8 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
 
   private readonly logger = new Logger(ChatGateway.name);
   private sessionConnections = new Map<string, SessionConnection>();
-  private connectedAdmins = new Set<string>();
+  private connectedAdmins = new Map<string, AuthenticatedSocket>();
+  private connectedUsers = new Map<string, AuthenticatedSocket>();
   private recentNotifications = new Set<string>();
   private billingIntervals = new Map<string, NodeJS.Timeout>(); // Track billing intervals per session
 
@@ -179,7 +187,11 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
 
       // Track session connections
       if (!this.sessionConnections.has(sessionId)) {
-        this.sessionConnections.set(sessionId, {});
+        this.sessionConnections.set(sessionId, {
+          user: null,
+          admin: null,
+          sessionId: sessionId
+        });
       }
       
       const sessionConn = this.sessionConnections.get(sessionId);
@@ -917,6 +929,10 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     } catch (error) {
       this.logger.error('Message replay error:', error);
     }
+  }
+
+  afterInit(server: Server) {
+    this.logger.log('WebSocket Gateway initialized');
   }
 
   // Check if no admin is connected and send SMS notifications to offline admins
