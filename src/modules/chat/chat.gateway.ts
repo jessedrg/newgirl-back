@@ -935,7 +935,7 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     this.logger.log('WebSocket Gateway initialized');
   }
 
-  // Check if no admin is connected and send SMS notifications to offline admins
+  // Check if no admin is assigned to this chat session and send SMS notifications to all enabled admins
   private async checkAndNotifyAdminsIfNeeded(sessionId: string): Promise<void> {
     try {
       this.logger.log(`Checking if SMS notification needed for session ${sessionId}`);
@@ -958,15 +958,9 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
         return;
       }
 
-      // Check if any admin is online globally
-      const hasOnlineAdmin = this.connectedAdmins.size > 0;
-      
-      if (hasOnlineAdmin) {
-        this.logger.log(`Admins are online but not in this session ${sessionId}, no SMS needed`);
-        return;
-      }
-
-      this.logger.log(`[SMS NOTIFICATION] No admins online - proceeding with SMS notifications for session ${sessionId}`);
+      // NEW LOGIC: Send SMS to all enabled admins when no admin is assigned to this specific session
+      // This happens regardless of whether other admins are online in other sessions
+      this.logger.log(`[SMS NOTIFICATION] No admin assigned to session ${sessionId} - proceeding with SMS notifications to all enabled admins`);
 
       // Mark this session as notified to prevent duplicates
       this.recentNotifications.add(notificationKey);
@@ -977,8 +971,8 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
         this.logger.log(`[SMS NOTIFICATION] Cleared notification lock for session ${sessionId}`);
       }, 5 * 60 * 1000); // 5 minutes
 
-      // No admins online - send SMS notifications
-      this.logger.log(`No admins online for session ${sessionId}, sending SMS notifications`);
+      // Send SMS notifications to all enabled admins when no admin is assigned to this session
+      this.logger.log(`No admin assigned to session ${sessionId}, sending SMS notifications to all enabled admins`);
 
       // Get all admins with phone numbers and SMS enabled
       const adminsToNotify = await this.adminModel.find({
