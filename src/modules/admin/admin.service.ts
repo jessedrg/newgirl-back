@@ -75,6 +75,20 @@ export class AdminService {
 
   // Get all active chat sessions for admin panel
   async getActiveChatSessions(adminId: string): Promise<ActiveChatSessionDto[]> {
+    console.log('🔍 Fetching active chat sessions...');
+    
+    // First, let's see how many total sessions exist
+    const totalSessions = await this.chatSessionModel.countDocuments({});
+    const activeSessionsCount = await this.chatSessionModel.countDocuments({ status: 'active' });
+    
+    // Let's see what statuses actually exist
+    const statusCounts = await this.chatSessionModel.aggregate([
+      { $group: { _id: '$status', count: { $sum: 1 } } }
+    ]);
+    
+    console.log(`📊 Total sessions in DB: ${totalSessions}, Active sessions: ${activeSessionsCount}`);
+    console.log('📈 Status breakdown:', statusCounts);
+    
     const sessions = await this.chatSessionModel
       .find({ status: 'active' })
       .populate('userId', 'email profile')
@@ -82,6 +96,8 @@ export class AdminService {
       .populate('adminId', 'name')
       .sort({ lastActivity: 1 }) // Oldest first (highest priority)
       .exec();
+      
+    console.log(`📋 Found ${sessions.length} active sessions after population`);
 
     // Remove any potential duplicates based on session ID
     const uniqueSessions = sessions.filter((session, index, self) => 
@@ -194,6 +210,13 @@ export class AdminService {
       await this.chatSessionModel.findByIdAndUpdate(adminSendMessageDto.sessionId, {
         $inc: { minutesUsed: 1 }
       });
+
+      // Mark session as billing started - minute counter will be handled by ChatGateway
+      await this.chatSessionModel.findByIdAndUpdate(adminSendMessageDto.sessionId, {
+        billingStarted: true
+      });
+      
+      console.log('🕐 Billing started for session:', adminSendMessageDto.sessionId);
     }
 
     // Determine sender type and ID based on sendAs parameter
@@ -249,6 +272,11 @@ export class AdminService {
     // Update admin's active chat count
     await this.adminModel.findByIdAndUpdate(adminId, {
       $inc: { activeChatSessions: -1 }
+    });
+
+    // Pause billing when admin is released
+    await this.chatSessionModel.findByIdAndUpdate(sessionId, {
+      billingPaused: true
     });
   }
 
@@ -449,10 +477,48 @@ export class AdminService {
   // Helper method to handle billing for first admin message
   private async handleBillingForFirstMessage(userId: string): Promise<void> {
     // Deduct 1 minute from user's wallet
-    await this.userWalletModel.findOneAndUpdate(
+    const updatedWallet = await this.userWalletModel.findOneAndUpdate(
       { userId: new Types.ObjectId(userId) },
-      { $inc: { chatMinutes: -1 } }
+      { $inc: { 'balance.chatMinutes': -1, 'usage.totalChatMinutesUsed': 1 } },
+      { new: true }
     );
+
+    console.log(`[ADMIN SERVICE] First admin message - deducted 1 minute. New balance: ${updatedWallet?.balance?.chatMinutes}`);
+  }
+
+  // Get available admin for auto-assignment (least busy online admin)
+  async getAvailableAdmin(): Promise<AdminDocument | null> {
+    const availableAdmin = await this.adminModel
+      .findOne({ 
+        isOnline: true, 
+        isActive: true 
+      })
+      .sort({ activeChatSessions: 1 }) // Get admin with least active chats
+      .exec();
+
+    return availableAdmin;
+  }
+
+  // Auto-assign chat session to available admin
+  async autoAssignChatSession(sessionId: string): Promise<boolean> {
+    const availableAdmin = await this.getAvailableAdmin();
+    
+    if (!availableAdmin) {
+      return false; // No available admin
+    }
+
+    // Update chat session with admin assignment
+    await this.chatSessionModel.findByIdAndUpdate(sessionId, {
+      adminId: availableAdmin._id,
+      isAdminActive: false // Admin not actively chatting yet, just assigned
+    });
+
+    // Update admin's active chat count
+    await this.adminModel.findByIdAndUpdate(availableAdmin._id, {
+      $inc: { activeChatSessions: 1 }
+    });
+
+    return true;
   }
 
   // Helper method to format admin profile

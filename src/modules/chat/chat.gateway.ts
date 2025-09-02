@@ -128,8 +128,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (sessionConn) {
         if (client.userType === 'user') {
           sessionConn.user = undefined;
-          // User disconnect ends the session completely, so clean up
-          this.sessionConnections.delete(client.sessionId);
+          // Don't delete connection immediately - user might reconnect
+          this.logger.log(`User disconnected from session ${client.sessionId}, keeping session for potential reconnection`);
         } else if (client.userType === 'admin') {
           sessionConn.admin = undefined;
           // Admin disconnect keeps session alive for user, don't delete connection
@@ -195,16 +195,35 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         timestamp: new Date()
       });
 
-      // If admin joins and user is present, resume billing
-      if (client.userType === 'admin' && sessionConn.user) {
-        await this.resumeBilling(sessionId);
+      // If admin joins, notify user that admin is now online
+      if (client.userType === 'admin') {
+        // Notify user that admin joined
+        if (sessionConn.user && sessionConn.user.connected) {
+          sessionConn.user.emit('admin_joined', {
+            sessionId,
+            adminId: client.adminId,
+            timestamp: new Date()
+          });
+          
+          // Resume billing when both are present
+          await this.resumeBilling(sessionId);
+          await this.startMinuteCounter(sessionId);
+        }
         
         // Replay undelivered user messages to admin
         await this.replayUndeliveredMessages(sessionId, client);
       }
 
-      // If user joins and admin is present, start billing
-      if (client.userType === 'user' && sessionConn.admin) {
+      // If user joins and admin is present, resume billing
+      if (client.userType === 'user' && sessionConn.admin && sessionConn.admin.connected) {
+        // Notify user that admin is online
+        client.emit('admin_joined', {
+          sessionId,
+          adminId: sessionConn.admin.adminId,
+          timestamp: new Date()
+        });
+        
+        await this.resumeBilling(sessionId);
         await this.startMinuteCounter(sessionId);
       }
 
@@ -454,10 +473,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // Helper method to handle user disconnect
   private async handleUserDisconnect(sessionId: string, userId: string) {
     try {
-      // User disconnect should END the session completely
+      // User disconnect should end the session immediately and notify admin
       this.logger.log(`User ${userId} disconnected from session ${sessionId} - ending session`);
       
-      // Stop the minute counter when session ends
+      // Stop billing when user disconnects
       this.stopMinuteCounter(sessionId);
       
       // End the chat session in database
@@ -466,30 +485,44 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         endedAt: new Date(),
         endedBy: 'user_disconnect'
       });
-
-      // Notify admin if present that session has ended
+      
+      // Notify admin immediately that user disconnected and session ended
       const sessionConn = this.sessionConnections.get(sessionId);
-      if (sessionConn?.admin) {
+      if (sessionConn?.admin && sessionConn.admin.connected) {
+        sessionConn.admin.emit('user_disconnected', {
+          sessionId,
+          userId,
+          sessionEnded: true,
+          reason: 'user_disconnect',
+          timestamp: new Date()
+        });
+        
+        // Also emit session_ended event for admin chat interface to close
         sessionConn.admin.emit('session_ended', {
           sessionId,
           userId,
+          reason: 'user_disconnect',
           timestamp: new Date()
         });
       }
+      
+      // Clean up session connections immediately
+      this.sessionConnections.delete(sessionId);
+      
     } catch (error) {
       this.logger.error('Handle user disconnect error:', error);
     }
   }
 
   // Helper method to handle admin disconnect - PAUSE BILLING
-  private async handleAdminDisconnect(sessionId: string, adminId: string) {
+  async handleAdminDisconnect(sessionId: string, adminId: string) {
     try {
       // Pause billing when admin disconnects
       await this.pauseBilling(sessionId);
 
       // Notify user if present
       const sessionConn = this.sessionConnections.get(sessionId);
-      if (sessionConn?.user) {
+      if (sessionConn?.user && sessionConn.user.connected) {
         sessionConn.user.emit('admin_disconnected', {
           sessionId,
           adminId,
@@ -538,6 +571,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  // Public method to start minute counter from admin service
+  async startMinuteCounterFromAdmin(sessionId: string) {
+    return this.startMinuteCounter(sessionId);
+  }
+
   // Start minute counter - deduct 1 minute every 60 seconds
   private async startMinuteCounter(sessionId: string) {
     // Clear existing interval if any
@@ -571,8 +609,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
           adminConnected: sessionConn?.admin?.connected
         });
         
-        if (!sessionConn?.user || !sessionConn?.admin) {
-          this.logger.log(`[BILLING] Missing connections for session ${sessionId} - stopping counter`);
+        // Only require user to be connected for billing to continue
+        // Admin can disconnect temporarily without stopping billing
+        if (!sessionConn?.user || !sessionConn.user.connected) {
+          this.logger.log(`[BILLING] User not connected for session ${sessionId} - stopping counter`);
           this.stopMinuteCounter(sessionId);
           return;
         }
@@ -593,30 +633,35 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
           return;
         }
 
-        // Deduct 1 minute
+        // Deduct 1 minute using findOneAndUpdate with new: true to get updated document
         this.logger.log(`[BILLING] Deducting 1 minute from wallet ${wallet._id}. Current: ${wallet.balance.chatMinutes}`);
-        const updateResult = await this.userWalletModel.findByIdAndUpdate(wallet._id, {
-          $inc: { 'balance.chatMinutes': -1, 'usage.totalChatMinutesUsed': 1 }
-        });
-        this.logger.log(`[BILLING] Wallet update result:`, { success: !!updateResult });
-
-        // Notify user about updated balance
-        const updatedWallet = await this.userWalletModel.findById(wallet._id);
-        this.logger.log(`[BILLING] Updated wallet balance:`, {
-          newMinutes: updatedWallet?.balance?.chatMinutes,
-          totalUsed: updatedWallet?.usage?.totalChatMinutesUsed
+        const updatedWallet = await this.userWalletModel.findByIdAndUpdate(
+          wallet._id,
+          { $inc: { 'balance.chatMinutes': -1, 'usage.totalChatMinutesUsed': 1 } },
+          { new: true } // Return the updated document
+        );
+        
+        if (!updatedWallet) {
+          this.logger.error(`[BILLING] Failed to update wallet ${wallet._id}`);
+          return;
+        }
+        
+        this.logger.log(`[BILLING] Successfully updated wallet:`, {
+          walletId: updatedWallet._id,
+          newMinutes: updatedWallet.balance.chatMinutes,
+          totalUsed: updatedWallet.usage.totalChatMinutesUsed
         });
         
         // Notify user about updated balance
-        if (sessionConn.user) {
+        if (sessionConn.user && sessionConn.user.connected) {
           sessionConn.user.emit('balance_update', {
             chatMinutes: updatedWallet.balance.chatMinutes,
             timestamp: new Date()
           });
         }
 
-        // Notify admin about user's updated balance
-        if (sessionConn.admin) {
+        // Notify admin about user's updated balance (if connected)
+        if (sessionConn.admin && sessionConn.admin.connected) {
           sessionConn.admin.emit('user_balance_update', {
             chatMinutes: updatedWallet.balance.chatMinutes,
             totalUsed: updatedWallet.usage.totalChatMinutesUsed,
@@ -717,13 +762,17 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       lastActivity: new Date()
     });
 
-    // Handle billing - deduct minute on first admin message
+    // Handle billing - deduct minute on first admin message and start counter
     if (session.totalMessages === 0 || !session.billingStarted) {
-      await this.handleBillingForFirstMessage(session.userId.toString());
+      await this.handleBillingForFirstMessage(session.userId.toString(), sessionId);
       await this.chatSessionModel.findByIdAndUpdate(sessionId, {
         billingStarted: true,
         $inc: { minutesUsed: 1 }
       });
+      
+      // Start continuous minute counter for ongoing billing
+      console.log('🕐 Starting minute counter for WebSocket admin message in session:', sessionId);
+      await this.startMinuteCounter(sessionId);
     }
 
     return {
@@ -744,25 +793,56 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
 
-    // Update session to remove admin assignment
+    // Update session to remove admin assignment but keep session active for user
+    // This makes the chat appear as unassigned in admin panel again
     await this.chatSessionModel.findByIdAndUpdate(sessionId, {
       $unset: { adminId: 1 },
-      $set: { isAdminActive: false }
+      $set: { 
+        isAdminActive: false,
+        // Keep status as 'active' so it appears in unassigned chats
+        status: 'active'
+      }
     });
 
     // Update admin's active chat count
     await this.adminModel.findByIdAndUpdate(adminId, {
       $inc: { activeChatSessions: -1 }
     });
+    
+    this.logger.log(`Admin ${adminId} released from session ${sessionId} - session remains active for user and will appear as unassigned`);
   }
 
   // Helper method to handle billing for first admin message
-  private async handleBillingForFirstMessage(userId: string) {
+  private async handleBillingForFirstMessage(userId: string, sessionId: string) {
     // Deduct 1 minute from user's wallet
-    await this.userWalletModel.findOneAndUpdate(
+    const updatedWallet = await this.userWalletModel.findOneAndUpdate(
       { userId: new Types.ObjectId(userId) },
-      { $inc: { chatMinutes: -1 } }
+      { $inc: { 'balance.chatMinutes': -1, 'usage.totalChatMinutesUsed': 1 } },
+      { new: true }
     );
+
+    this.logger.log(`[BILLING] First admin message - deducted 1 minute. New balance: ${updatedWallet?.balance?.chatMinutes}`);
+
+    // Notify frontend about balance update to trigger countdown
+    const sessionConn = this.sessionConnections.get(sessionId);
+    if (sessionConn && updatedWallet) {
+      // Notify user about updated balance
+      if (sessionConn.user && sessionConn.user.connected) {
+        sessionConn.user.emit('balance_update', {
+          chatMinutes: updatedWallet.balance.chatMinutes,
+          timestamp: new Date()
+        });
+      }
+
+      // Notify admin about user's updated balance (if connected)
+      if (sessionConn.admin && sessionConn.admin.connected) {
+        sessionConn.admin.emit('user_balance_update', {
+          chatMinutes: updatedWallet.balance.chatMinutes,
+          totalUsed: updatedWallet.usage.totalChatMinutesUsed,
+          timestamp: new Date()
+        });
+      }
+    }
   }
 
   // Helper method to update typing status for WebSocket (bypasses user ownership check)

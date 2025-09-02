@@ -55,6 +55,13 @@ export class ChatService {
       });
 
       await newSession.save();
+      console.log('✅ New chat session created:', {
+        sessionId: newSession._id,
+        userId,
+        girlfriendId: startChatDto.girlfriendId,
+        status: newSession.status
+      });
+      
       return this.formatChatSession(newSession, girlfriend);
     } catch (error) {
       // Handle duplicate key error - fetch existing session
