@@ -36,6 +36,12 @@ export class Admin {
   @Prop({ type: [String], default: [] })
   specialties: string[]; // Tags they're good at (e.g., ['music', 'travel'])
 
+  @Prop({ type: String, default: null })
+  phoneNumber: string | null; // Phone number for SMS notifications
+
+  @Prop({ type: Boolean, default: true })
+  smsNotificationsEnabled: boolean; // Whether to receive SMS notifications
+
   @Prop({ type: Object, default: {} })
   stats: {
     totalChatsHandled?: number;

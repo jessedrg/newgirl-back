@@ -14,6 +14,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { ChatService } from './chat.service';
 import { SessionTrackingService } from './services/session-tracking.service';
+import { TwilioService } from '../notifications/twilio.service';
 import { ChatSession, ChatSessionDocument } from '../../schemas/chat-session.schema';
 import { ChatMessage, ChatMessageDocument } from '../../schemas/chat-message.schema';
 import { Admin, AdminDocument } from '../../schemas/admin.schema';
@@ -48,6 +49,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private jwtService: JwtService,
     private chatService: ChatService,
     private sessionTrackingService: SessionTrackingService,
+    private twilioService: TwilioService,
     @InjectModel(ChatSession.name) private chatSessionModel: Model<ChatSessionDocument>,
     @InjectModel(ChatMessage.name) private chatMessageModel: Model<ChatMessageDocument>,
     @InjectModel(Admin.name) private adminModel: Model<AdminDocument>,
@@ -183,6 +185,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const sessionConn = this.sessionConnections.get(sessionId);
       if (client.userType === 'user') {
         sessionConn.user = client;
+        
+        // Check if no admin is connected and send SMS notifications
+        await this.checkAndNotifyAdminsIfNeeded(sessionId);
       } else {
         sessionConn.admin = client;
       }
@@ -911,6 +916,64 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     } catch (error) {
       this.logger.error('Message replay error:', error);
+    }
+  }
+
+  // Check if no admin is connected and send SMS notifications to offline admins
+  private async checkAndNotifyAdminsIfNeeded(sessionId: string): Promise<void> {
+    try {
+      // Check if any admin is currently connected to this session
+      const sessionConn = this.sessionConnections.get(sessionId);
+      const hasConnectedAdmin = sessionConn?.admin && sessionConn.admin.connected;
+
+      if (hasConnectedAdmin) {
+        this.logger.log(`Admin already connected to session ${sessionId}, no SMS needed`);
+        return;
+      }
+
+      // Check if any admin is online globally
+      const hasOnlineAdmin = this.connectedAdmins.size > 0;
+      
+      if (hasOnlineAdmin) {
+        this.logger.log(`Admins are online but not in this session ${sessionId}, no SMS needed`);
+        return;
+      }
+
+      // No admins online - send SMS notifications
+      this.logger.log(`No admins online for session ${sessionId}, sending SMS notifications`);
+
+      // Get all admins with phone numbers and SMS enabled
+      const adminsToNotify = await this.adminModel.find({
+        isActive: true,
+        phoneNumber: { $exists: true, $ne: null },
+        smsNotificationsEnabled: true
+      }).select('phoneNumber name');
+
+      if (adminsToNotify.length === 0) {
+        this.logger.warn('No admins configured for SMS notifications');
+        return;
+      }
+
+      const phoneNumbers = adminsToNotify.map(admin => admin.phoneNumber).filter(Boolean);
+      
+      if (phoneNumbers.length === 0) {
+        this.logger.warn('No valid phone numbers found for admin notifications');
+        return;
+      }
+
+      // Get session info for the message
+      const session = await this.chatSessionModel.findById(sessionId).populate('userId', 'name email');
+      const userName = (session?.userId as any)?.name || 'Unknown User';
+
+      const message = `🚨 NewGirl Alert: ${userName} has started a new chat session and needs assistance! Please log in to the admin panel to respond.`;
+
+      // Send SMS notifications
+      await this.twilioService.sendAdminNotification(phoneNumbers, message);
+
+      this.logger.log(`SMS notifications sent to ${phoneNumbers.length} admins for session ${sessionId}`);
+
+    } catch (error) {
+      this.logger.error(`Failed to send admin SMS notifications for session ${sessionId}:`, error);
     }
   }
 }

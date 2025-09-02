@@ -8,6 +8,7 @@ import { ChatGateway } from './chat.gateway';
 import { SessionTrackingService } from './services/session-tracking.service';
 import { SessionTrackingController } from './controllers/session-tracking.controller';
 import { UploadService } from './services/upload.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { ChatSession, ChatSessionSchema } from '../../schemas/chat-session.schema';
 import { ChatMessage, ChatMessageSchema } from '../../schemas/chat-message.schema';
 import { ChatSessionTracking, ChatSessionTrackingSchema } from '../../schemas/chat-session-tracking.schema';
@@ -20,6 +21,7 @@ import { Girlfriend, GirlfriendSchema } from '../../schemas/girlfriend.schema';
 @Module({
   imports: [
     ConfigModule,
+    NotificationsModule,
     MongooseModule.forFeature([
       { name: ChatSession.name, schema: ChatSessionSchema },
       { name: ChatMessage.name, schema: ChatMessageSchema },
