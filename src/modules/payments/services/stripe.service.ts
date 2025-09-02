@@ -53,6 +53,7 @@ export class StripeService {
         receipt_email: customerEmail,
         automatic_payment_methods: {
           enabled: true,
+          allow_redirects: 'never',
         },
       });
 
