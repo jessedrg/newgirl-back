@@ -185,6 +185,9 @@ export class User {
 
   @Prop()
   deletedAt: Date;
+
+  @Prop({ type: [{ type: String }], default: [] })
+  savedGirlfriends: string[];
 }
 
 export type UserDocument = User & Document;

@@ -13,6 +13,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { ChatService } from './chat.service';
+import { SessionTrackingService } from './services/session-tracking.service';
 import { ChatSession, ChatSessionDocument } from '../../schemas/chat-session.schema';
 import { ChatMessage, ChatMessageDocument } from '../../schemas/chat-message.schema';
 import { Admin, AdminDocument } from '../../schemas/admin.schema';
@@ -46,6 +47,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private jwtService: JwtService,
     private chatService: ChatService,
+    private sessionTrackingService: SessionTrackingService,
     @InjectModel(ChatSession.name) private chatSessionModel: Model<ChatSessionDocument>,
     @InjectModel(ChatMessage.name) private chatMessageModel: Model<ChatMessageDocument>,
     @InjectModel(Admin.name) private adminModel: Model<AdminDocument>,
