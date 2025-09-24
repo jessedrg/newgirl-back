@@ -56,6 +56,9 @@ export class ChatSession {
 
   @Prop({ type: String, default: null })
   sessionNotes: string | null; // Admin notes about the session
+
+  @Prop({ type: String, default: null })
+  endedBy: string | null; // Who/what ended the session (user_disconnect, admin_action, etc.)
 }
 
 export const ChatSessionSchema = SchemaFactory.createForClass(ChatSession);

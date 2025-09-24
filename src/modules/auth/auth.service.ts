@@ -5,7 +5,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { User, UserDocument } from '../../schemas/user.schema';
-import { RegisterDto, LoginDto, RegisterResponseDto, LoginResponseDto, ResendVerificationDto, ResendVerificationResponseDto } from './dto/auth.dto';
+import { RegisterDto, LoginDto, RegisterResponseDto, LoginResponseDto } from './dto/auth.dto';
 import { EmailService } from '../email/email.service';
 
 @Injectable()
@@ -74,8 +74,8 @@ export class AuthService {
         displayName: `${firstName} ${lastName}`,
         dateOfBirth: birthDate,
       },
-      status: 'pending_verification',
-      emailVerified: false,
+      status: 'active',
+      emailVerified: true,
       preferences: {
         language: 'en-US',
         theme: 'dark',
@@ -100,30 +100,29 @@ export class AuthService {
 
     const savedUser = await user.save();
 
-    // Generate verification token
-    const verificationToken = this.jwtService.sign(
-      { userId: savedUser._id, type: 'email_verification' },
-      { expiresIn: '24h' }
+    // Generate tokens immediately for simplified registration
+    const payload = { userId: savedUser._id, email: savedUser.email };
+    const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
+    const refreshToken = this.jwtService.sign(
+      { ...payload, type: 'refresh' },
+      { expiresIn: '7d' }
     );
-
-    // Send verification email
-    console.log(`🔄 AuthService: About to call emailService.sendVerificationEmail`);
-    console.log(`📧 Email: ${email}, FirstName: ${firstName}, TokenLength: ${verificationToken.length}`);
-    
-    try {
-      await this.emailService.sendVerificationEmail(email, verificationToken, firstName);
-      console.log(`✅ AuthService: Email service call completed successfully`);
-    } catch (error) {
-      console.error(`❌ AuthService: Email service call failed:`, error);
-      throw error;
-    }
 
     return {
       success: true,
-      message: 'Registration successful. Please check your email.',
-      userId: savedUser._id.toString(),
-      verificationRequired: true,
-      verificationMethod: 'email'
+      message: 'Registration successful! You are now logged in.',
+      accessToken,
+      refreshToken,
+      user: {
+        id: savedUser._id.toString(),
+        email: savedUser.email,
+        profile: savedUser.profile
+      },
+      subscription: {
+        tier: 'free',
+        status: 'active'
+      },
+      expiresIn: 900
     };
   }
 
@@ -138,17 +137,6 @@ export class AuthService {
         error: {
           code: 'INVALID_CREDENTIALS',
           message: 'Invalid email or password'
-        }
-      });
-    }
-
-    // Check if email is verified
-    if (!user.emailVerified) {
-      throw new UnauthorizedException({
-        success: false,
-        error: {
-          code: 'EMAIL_NOT_VERIFIED',
-          message: 'Please verify your email before logging in'
         }
       });
     }
@@ -279,110 +267,7 @@ export class AuthService {
     return { success: true };
   }
 
-  async verifyEmail(token: string): Promise<{ success: boolean; message: string }> {
-    try {
-      const payload = this.jwtService.verify(token);
-      
-      if (payload.type !== 'email_verification') {
-        throw new UnauthorizedException('Invalid token type');
-      }
 
-      const user = await this.userModel.findById(payload.userId).exec();
-      if (!user) {
-        throw new UnauthorizedException('User not found');
-      }
-
-      if (user.emailVerified) {
-        return {
-          success: true,
-          message: 'Email already verified'
-        };
-      }
-
-      user.emailVerified = true;
-      user.status = 'active';
-      await user.save();
-
-      return {
-        success: true,
-        message: 'Email verified successfully'
-      };
-    } catch (error) {
-      throw new UnauthorizedException({
-        success: false,
-        error: {
-          code: 'INVALID_VERIFICATION_TOKEN',
-          message: 'Invalid or expired verification token'
-        }
-      });
-    }
-  }
-
-  async resendVerification(resendDto: ResendVerificationDto): Promise<ResendVerificationResponseDto> {
-    const { email } = resendDto;
-
-    // Find the user
-    const user = await this.userModel.findOne({ email }).exec();
-    if (!user) {
-      throw new BadRequestException({
-        success: false,
-        error: {
-          code: 'USER_NOT_FOUND',
-          message: 'No account found with this email address',
-          field: 'email'
-        }
-      });
-    }
-
-    // Check if user is already verified
-    if (user.emailVerified) {
-      throw new BadRequestException({
-        success: false,
-        error: {
-          code: 'EMAIL_ALREADY_VERIFIED',
-          message: 'Email address is already verified'
-        }
-      });
-    }
-
-    // Check if user account is active (not suspended/banned)
-    if (user.status === 'suspended' || user.status === 'banned') {
-      throw new BadRequestException({
-        success: false,
-        error: {
-          code: 'ACCOUNT_SUSPENDED',
-          message: 'Account is suspended. Please contact support.'
-        }
-      });
-    }
-
-    // Generate new verification token
-    const verificationToken = this.jwtService.sign(
-      { userId: user._id, type: 'email_verification' },
-      { expiresIn: '24h' }
-    );
-
-    // Send verification email
-    console.log(`🔄 ResendVerification: About to call emailService.sendVerificationEmail`);
-    console.log(`📧 Email: ${email}, FirstName: ${user.profile.firstName}, TokenLength: ${verificationToken.length}`);
-    
-    try {
-      await this.emailService.sendVerificationEmail(
-        email, 
-        verificationToken, 
-        user.profile.firstName
-      );
-      console.log(`✅ ResendVerification: Email service call completed successfully`);
-    } catch (error) {
-      console.error(`❌ ResendVerification: Email service call failed:`, error);
-      throw error;
-    }
-
-    return {
-      success: true,
-      message: 'Verification email sent successfully. Please check your inbox.'
-    };
-  }
 
   async handleGoogleCallback(code: string, state?: string): Promise<any> {
     try {

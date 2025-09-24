@@ -32,7 +32,20 @@ export class ChatService {
       throw new NotFoundException('Girlfriend not found');
     }
 
-    // Check if user already has an active chat with this girlfriend
+    // First, end any existing active sessions for this user with ANY girlfriend
+    // This prevents multiple active sessions when user switches between chats
+    await this.chatSessionModel.updateMany({
+      userId: new Types.ObjectId(userId),
+      status: 'active'
+    }, {
+      status: 'ended',
+      endedAt: new Date(),
+      endedBy: 'new_session_started'
+    });
+
+    console.log(`🔄 Ended any existing active sessions for user ${userId} before creating new session`);
+
+    // Check if user already has an active chat with this specific girlfriend (after cleanup)
     const existingSession = await this.chatSessionModel.findOne({
       userId: new Types.ObjectId(userId),
       girlfriendId: new Types.ObjectId(startChatDto.girlfriendId),
@@ -40,7 +53,7 @@ export class ChatService {
     });
 
     if (existingSession) {
-      // Return existing session
+      // Return existing session (shouldn't happen after cleanup, but safety check)
       return this.formatChatSession(existingSession, girlfriend);
     }
 
@@ -159,9 +172,15 @@ export class ChatService {
   }
 
   // Get user's chat sessions
-  async getUserChatSessions(userId: string): Promise<ChatSessionDto[]> {
+  async getUserChatSessions(userId: string, girlfriendId?: string): Promise<ChatSessionDto[]> {
+    const query: any = { userId: new Types.ObjectId(userId) };
+    
+    if (girlfriendId) {
+      query.girlfriendId = new Types.ObjectId(girlfriendId);
+    }
+
     const sessions = await this.chatSessionModel
-      .find({ userId: new Types.ObjectId(userId) })
+      .find(query)
       .populate('girlfriendId')
       .sort({ lastActivity: -1 })
       .exec();

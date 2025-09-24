@@ -91,8 +91,12 @@ export class ChatController {
     description: 'Chat sessions retrieved successfully',
     type: [ChatSessionDto]
   })
-  async getUserChatSessions(@Request() req): Promise<ChatSessionDto[]> {
-    return this.chatService.getUserChatSessions(req.user.userId);
+  @ApiQuery({ name: 'girlfriendId', required: false, type: String, description: 'Filter by girlfriend ID' })
+  async getUserChatSessions(
+    @Request() req,
+    @Query('girlfriendId') girlfriendId?: string
+  ): Promise<ChatSessionDto[]> {
+    return this.chatService.getUserChatSessions(req.user.userId, girlfriendId);
   }
 
   @Get('sessions/:sessionId/messages')

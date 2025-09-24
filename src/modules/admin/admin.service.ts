@@ -75,20 +75,6 @@ export class AdminService {
 
   // Get all active chat sessions for admin panel
   async getActiveChatSessions(adminId: string): Promise<ActiveChatSessionDto[]> {
-    console.log('🔍 Fetching active chat sessions...');
-    
-    // First, let's see how many total sessions exist
-    const totalSessions = await this.chatSessionModel.countDocuments({});
-    const activeSessionsCount = await this.chatSessionModel.countDocuments({ status: 'active' });
-    
-    // Let's see what statuses actually exist
-    const statusCounts = await this.chatSessionModel.aggregate([
-      { $group: { _id: '$status', count: { $sum: 1 } } }
-    ]);
-    
-    console.log(`📊 Total sessions in DB: ${totalSessions}, Active sessions: ${activeSessionsCount}`);
-    console.log('📈 Status breakdown:', statusCounts);
-    
     const sessions = await this.chatSessionModel
       .find({ status: 'active' })
       .populate('userId', 'email profile')
@@ -96,8 +82,6 @@ export class AdminService {
       .populate('adminId', 'name')
       .sort({ lastActivity: 1 }) // Oldest first (highest priority)
       .exec();
-      
-    console.log(`📋 Found ${sessions.length} active sessions after population`);
 
     // Remove any potential duplicates based on session ID
     const uniqueSessions = sessions.filter((session, index, self) => 

@@ -9,8 +9,6 @@ import {
   RefreshTokenDto,
   RegisterResponseDto,
   LoginResponseDto,
-  ResendVerificationDto,
-  ResendVerificationResponseDto,
   OAuthInitiateResponseDto,
   ErrorResponseDto 
 } from './dto/auth.dto';
@@ -73,23 +71,7 @@ export class AuthController {
     return this.authService.logout(userId, body.refreshToken);
   }
 
-  @Get('verify-email')
-  @ApiOperation({ summary: 'Verify email address' })
-  @ApiResponse({ status: 200, description: 'Email verified successfully' })
-  @ApiResponse({ status: 401, description: 'Invalid verification token', type: ErrorResponseDto })
-  async verifyEmail(@Query('token') token: string) {
-    return this.authService.verifyEmail(token);
-  }
 
-  @Post('resend-verification')
-  @ApiOperation({ summary: 'Resend email verification' })
-  @ApiResponse({ status: 200, description: 'Verification email sent successfully', type: ResendVerificationResponseDto })
-  @ApiResponse({ status: 400, description: 'Bad request - user not found, already verified, or account suspended', type: ErrorResponseDto })
-  async resendVerification(@Body() resendDto: ResendVerificationDto): Promise<ResendVerificationResponseDto> {
-    console.log(`✅ ResendVerification: Email service call completed successfully`);
-    return this.authService.resendVerification(resendDto);
-    
-  }
 
   @Get('oauth/:provider/initiate')
   @ApiOperation({ summary: 'Initiate OAuth flow' })
@@ -205,28 +187,5 @@ export class AuthController {
     }
   }
 
-  @Post('forgot-password')
-  @UseGuards(ThrottlerGuard)
-  @ApiOperation({ summary: 'Request password reset' })
-  @ApiResponse({ status: 200, description: 'Password reset email sent' })
-  @ApiResponse({ status: 429, description: 'Too many requests', type: ErrorResponseDto })
-  async forgotPassword(@Body() body: { email: string }) {
-    // TODO: Implement password reset
-    return {
-      success: true,
-      message: 'If an account with this email exists, you will receive a password reset link.'
-    };
-  }
 
-  @Post('reset-password')
-  @ApiOperation({ summary: 'Reset password with token' })
-  @ApiResponse({ status: 200, description: 'Password reset successful' })
-  @ApiResponse({ status: 401, description: 'Invalid reset token', type: ErrorResponseDto })
-  async resetPassword(@Body() body: { token: string; newPassword: string }) {
-    // TODO: Implement password reset
-    return {
-      success: true,
-      message: 'Password reset successful'
-    };
-  }
 }

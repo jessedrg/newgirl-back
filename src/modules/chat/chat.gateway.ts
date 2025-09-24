@@ -32,6 +32,7 @@ interface SessionConnection {
   user: AuthenticatedSocket | null;
   admin: AuthenticatedSocket | null;
   sessionId: string;
+  userGirlfriendKey?: string; // Unique key for user-girlfriend pair
 }
 
 @Injectable()
@@ -52,6 +53,7 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
   private connectedUsers = new Map<string, AuthenticatedSocket>();
   private recentNotifications = new Set<string>();
   private billingIntervals = new Map<string, NodeJS.Timeout>(); // Track billing intervals per session
+  private userGirlfriendConnections = new Map<string, string>(); // Track active sessions by user-girlfriend pair
 
   constructor(
     private jwtService: JwtService,
@@ -78,17 +80,9 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       let userType: 'user' | 'admin';
       
       try {
-        console.log('🔑 ChatGateway - JWT_SECRET exists:', !!process.env.JWT_SECRET);
-        console.log('🔑 ChatGateway - JWT_SECRET length:', process.env.JWT_SECRET?.length || 0);
-        console.log('🔑 ChatGateway - Token length:', token.length);
-        console.log('🔑 ChatGateway - Token preview:', token.substring(0, 50) + '...');
-        
         decoded = this.jwtService.verify(token);
-        console.log('✅ ChatGateway - Token verified successfully:', { userId: decoded.userId, adminId: decoded.adminId });
         userType = decoded.adminId ? 'admin' : 'user';
       } catch (error) {
-        console.error('❌ ChatGateway - Token verification failed:', error.message);
-        console.error('❌ ChatGateway - Token that failed:', token.substring(0, 50) + '...');
         this.logger.error('Invalid token:', error.message);
         client.disconnect();
         return;
@@ -142,6 +136,13 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
           this.logger.log(`User disconnected from session ${client.sessionId}, keeping session for potential reconnection`);
         } else if (client.userType === 'admin') {
           sessionConn.admin = undefined;
+          
+          // Release user-girlfriend pair when admin disconnects
+          if (sessionConn.userGirlfriendKey) {
+            this.userGirlfriendConnections.delete(sessionConn.userGirlfriendKey);
+            this.logger.log(`Released user-girlfriend pair: ${sessionConn.userGirlfriendKey}`);
+          }
+          
           // Admin disconnect keeps session alive for user, don't delete connection
           this.logger.log(`Admin disconnected from session ${client.sessionId}, session remains active for user`);
         }
@@ -173,11 +174,27 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
           return;
         }
       } else if (client.userType === 'admin') {
-        // Admin can join any active session
+        // Admin can join any active session, but check for existing admin
         const session = await this.chatSessionModel.findById(sessionId);
         if (!session) {
           client.emit('error', { message: 'Session not found' });
           return;
+        }
+        
+        // Create user-girlfriend key for uniqueness
+        const userGirlfriendKey = `${session.userId}_${session.girlfriendId}`;
+        
+        // Check if another admin is already handling this user-girlfriend pair
+        const existingSessionId = this.userGirlfriendConnections.get(userGirlfriendKey);
+        if (existingSessionId && existingSessionId !== sessionId) {
+          const existingConnection = this.sessionConnections.get(existingSessionId);
+          if (existingConnection?.admin && existingConnection.admin.connected) {
+            client.emit('error', { 
+              message: 'Another admin is already handling this user. Please wait or contact them.',
+              existingSessionId: existingSessionId
+            });
+            return;
+          }
         }
       }
 
@@ -187,10 +204,15 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
 
       // Track session connections
       if (!this.sessionConnections.has(sessionId)) {
+        // Get session info for user-girlfriend key
+        const session = await this.chatSessionModel.findById(sessionId);
+        const userGirlfriendKey = session ? `${session.userId}_${session.girlfriendId}` : undefined;
+        
         this.sessionConnections.set(sessionId, {
           user: null,
           admin: null,
-          sessionId: sessionId
+          sessionId: sessionId,
+          userGirlfriendKey: userGirlfriendKey
         });
       }
       
@@ -202,6 +224,12 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
         await this.checkAndNotifyAdminsIfNeeded(sessionId);
       } else {
         sessionConn.admin = client;
+        
+        // Register this admin as handling this user-girlfriend pair
+        if (sessionConn.userGirlfriendKey) {
+          this.userGirlfriendConnections.set(sessionConn.userGirlfriendKey, sessionId);
+          this.logger.log(`Admin ${client.adminId} now handling user-girlfriend pair: ${sessionConn.userGirlfriendKey}`);
+        }
       }
 
       // Notify about connection
@@ -449,6 +477,12 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
           sessionConn.admin.leave(sessionId);
           sessionConn.admin.sessionId = undefined;
         }
+        
+        // Clean up user-girlfriend mapping
+        if (sessionConn?.userGirlfriendKey) {
+          this.userGirlfriendConnections.delete(sessionConn.userGirlfriendKey);
+        }
+        
         this.sessionConnections.delete(sessionId);
       }
 
@@ -490,13 +524,10 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
   // Helper method to handle user disconnect
   private async handleUserDisconnect(sessionId: string, userId: string) {
     try {
-      // User disconnect should end the session immediately and notify admin
-      this.logger.log(`User ${userId} disconnected from session ${sessionId} - ending session`);
-      
-      // Stop billing when user disconnects
+      // Stop billing immediately when user disconnects
       this.stopMinuteCounter(sessionId);
       
-      // End the chat session in database
+      // End the chat session in database immediately
       await this.chatSessionModel.findByIdAndUpdate(sessionId, {
         status: 'ended',
         endedAt: new Date(),
@@ -511,19 +542,26 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
           userId,
           sessionEnded: true,
           reason: 'user_disconnect',
+          message: 'User closed the chat - session ended',
           timestamp: new Date()
         });
         
-        // Also emit session_ended event for admin chat interface to close
         sessionConn.admin.emit('session_ended', {
           sessionId,
           userId,
           reason: 'user_disconnect',
+          message: 'User closed the chat',
           timestamp: new Date()
         });
+        
+        // Force admin to leave session room to trigger cleanup
+        sessionConn.admin.leave(sessionId);
       }
       
-      // Clean up session connections immediately
+      // Clean up session connections and user-girlfriend mapping completely
+      if (sessionConn?.userGirlfriendKey) {
+        this.userGirlfriendConnections.delete(sessionConn.userGirlfriendKey);
+      }
       this.sessionConnections.delete(sessionId);
       
     } catch (error) {
@@ -565,7 +603,6 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       // Stop the minute counter when billing is paused
       this.stopMinuteCounter(sessionId);
       
-      this.logger.log(`Billing paused for session ${sessionId}`);
     } catch (error) {
       this.logger.error('Pause billing error:', error);
     }
@@ -576,7 +613,6 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     try {
       // Update session to resume billing
       await this.chatService.resumeSessionBilling(sessionId);
-      this.logger.log(`Billing resumed for session ${sessionId}`);
       
       // Start the minute counter if both user and admin are connected
       const sessionConn = this.sessionConnections.get(sessionId);
@@ -810,23 +846,43 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       return;
     }
 
-    // Update session to remove admin assignment but keep session active for user
-    // This makes the chat appear as unassigned in admin panel again
-    await this.chatSessionModel.findByIdAndUpdate(sessionId, {
-      $unset: { adminId: 1 },
-      $set: { 
-        isAdminActive: false,
-        // Keep status as 'active' so it appears in unassigned chats
-        status: 'active'
-      }
-    });
+    // Check if session is already ended (user disconnected)
+    if (session.status === 'ended') {
+      // Just update admin's active chat count and return
+      await this.adminModel.findByIdAndUpdate(adminId, {
+        $inc: { activeChatSessions: -1 }
+      });
+      return;
+    }
+
+    // Check if user is still connected
+    const sessionConn = this.sessionConnections.get(sessionId);
+    const userStillConnected = sessionConn?.user && sessionConn.user.connected;
+
+    // Only keep session active if user is still connected
+    if (userStillConnected) {
+      // Update session to remove admin assignment but keep session active for user
+      await this.chatSessionModel.findByIdAndUpdate(sessionId, {
+        $unset: { adminId: 1 },
+        $set: { 
+          isAdminActive: false,
+          status: 'active' // Keep active only if user is connected
+        }
+      });
+    } else {
+      // User is not connected, just remove admin assignment without changing status
+      await this.chatSessionModel.findByIdAndUpdate(sessionId, {
+        $unset: { adminId: 1 },
+        $set: { 
+          isAdminActive: false
+        }
+      });
+    }
 
     // Update admin's active chat count
     await this.adminModel.findByIdAndUpdate(adminId, {
       $inc: { activeChatSessions: -1 }
     });
-    
-    this.logger.log(`Admin ${adminId} released from session ${sessionId} - session remains active for user and will appear as unassigned`);
   }
 
   // Helper method to handle billing for first admin message

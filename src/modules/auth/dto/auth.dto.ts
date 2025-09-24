@@ -78,17 +78,30 @@ export class RegisterResponseDto {
   @ApiProperty({ example: true })
   success: boolean;
 
-  @ApiProperty({ example: 'Registration successful. Please check your email.' })
+  @ApiProperty({ example: 'Registration successful! You are now logged in.' })
   message: string;
 
-  @ApiProperty({ example: '64f8b2c4e1234567890abcde' })
-  userId: string;
+  @ApiProperty({ example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' })
+  accessToken: string;
 
-  @ApiProperty({ example: true })
-  verificationRequired: boolean;
+  @ApiProperty({ example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' })
+  refreshToken: string;
 
-  @ApiProperty({ example: 'email' })
-  verificationMethod: string;
+  @ApiProperty()
+  user: {
+    id: string;
+    email: string;
+    profile: any;
+  };
+
+  @ApiProperty()
+  subscription: {
+    tier: string;
+    status: string;
+  };
+
+  @ApiProperty({ example: 900 })
+  expiresIn: number;
 }
 
 export class LoginResponseDto {
@@ -129,22 +142,6 @@ export class OAuthInitiateResponseDto {
   codeVerifier?: string;
 }
 
-export class ResendVerificationDto {
-  @IsEmail()
-  @ApiProperty({
-    example: 'user@example.com',
-    description: 'Email address to resend verification to'
-  })
-  email: string;
-}
-
-export class ResendVerificationResponseDto {
-  @ApiProperty({ example: true })
-  success: boolean;
-
-  @ApiProperty({ example: 'Verification email sent successfully' })
-  message: string;
-}
 
 export class ErrorResponseDto {
   success: boolean;
